@@ -1,23 +1,24 @@
 import path from 'path';
 import fs from 'fs/promises';
-import ffmpeg from 'fluent-ffmpeg';
-import ffmpegPath from '@ffmpeg-installer/ffmpeg';
+import { exec } from 'child_process';
 import { app } from 'electron';
 import { Worker } from 'worker_threads';
+import { promisify } from 'util';
 
-// Set ffmpeg path
-ffmpeg.setFfmpegPath(ffmpegPath.path);
+const execAsync = promisify(exec);
 
 export class MediaProcessor {
   private outputDir: string;
   private thumbnailsDir: string;
   private audioDir: string;
+  private pythonScriptsDir: string;
 
   constructor() {
     // Create output directories in app data directory
     this.outputDir = path.join(app.getPath('userData'), 'media');
     this.thumbnailsDir = path.join(this.outputDir, 'thumbnails');
     this.audioDir = path.join(this.outputDir, 'audio');
+    this.pythonScriptsDir = path.join(app.getAppPath(), 'python');
     this.ensureOutputDirsExist();
   }
 
@@ -35,6 +36,7 @@ export class MediaProcessor {
 
   /**
    * Process videos to extract audio and generate thumbnails concurrently using worker threads
+   * that call Python scripts with MoviePy and OpenCV
    */
   async processBatch(videos: any[]): Promise<any[]> {
     return new Promise((resolve) => {
@@ -42,79 +44,85 @@ export class MediaProcessor {
       const worker = new Worker(`
         const { parentPort, workerData } = require('worker_threads');
         const path = require('path');
-        const fs = require('fs');
-        const ffmpeg = require('fluent-ffmpeg');
-        const ffmpegPath = require('@ffmpeg-installer/ffmpeg');
+        const { exec } = require('child_process');
+        const util = require('util');
+        const execAsync = util.promisify(exec);
         
-        ffmpeg.setFfmpegPath(ffmpegPath.path);
-        
-        async function extractAudio(video, audioDir) {
-          return new Promise((resolve, reject) => {
-            const outputPath = path.join(audioDir, \`\${video.id}-audio.mp3\`);
+        async function extractAudio(video, audioDir, pythonScriptsDir) {
+          return new Promise(async (resolve, reject) => {
+            const outputPath = path.join(audioDir, video.id + '-audio.mp3');
             
-            ffmpeg(video.path)
-              .noVideo()
-              .audioCodec('libmp3lame')
-              .audioBitrate('128k')
-              .output(outputPath)
-              .on('end', () => {
-                resolve(outputPath);
-              })
-              .on('error', (err) => {
-                console.error('Error extracting audio:', err);
-                reject(err);
-              })
-              .run();
-          });
-        }
-        
-        async function generateThumbnails(video, thumbnailsDir) {
-          return new Promise((resolve, reject) => {
-            const videoId = video.id;
-            const thumbnailBaseName = path.join(thumbnailsDir, \`\${videoId}-thumb\`);
-            const thumbnails = [];
-            
-            // Get video duration first
-            ffmpeg.ffprobe(video.path, (err, metadata) => {
-              if (err) {
-                return reject(err);
-              }
-              
-              // Get the duration in seconds (rounded up)
-              const duration = Math.ceil(metadata.format.duration);
-              let thumbnailsCompleted = 0;
-              
-              // Create a thumbnail every second
-              ffmpeg(video.path)
-                .on('filenames', (filenames) => {
-                  // Store thumbnail paths
-                  thumbnails.push(...filenames.map(filename => path.join(thumbnailsDir, filename)));
-                })
-                .on('end', () => {
-                  resolve(thumbnails);
-                })
-                .on('error', (err) => {
-                  console.error('Error generating thumbnails:', err);
-                  reject(err);
-                })
-                .screenshots({
-                  count: duration,
-                  folder: thumbnailsDir,
-                  filename: \`\${videoId}-thumb-%i.png\`,
-                  size: '320x?'
-                });
-            });
-          });
-        }
-        
-        async function processVideo(video, audioDir, thumbnailsDir) {
-          try {
+            console.log('Starting audio extraction for video ' + video.id + '...');
             const startTime = Date.now();
             
-            // Run audio extraction and thumbnail generation in parallel
+            try {
+              // Call Python script for audio extraction using MoviePy
+              const pythonScript = path.join(pythonScriptsDir, 'extract_audio.py');
+              const command = \`python "\${pythonScript}" "\${video.path}" "\${outputPath}"\`;
+              
+              console.log('Executing command:', command);
+              const { stdout, stderr } = await execAsync(command);
+              
+              if (stderr) {
+                console.error('Python stderr:', stderr);
+              }
+              
+              console.log('Python stdout:', stdout);
+              
+              const endTime = Date.now();
+              const processingTime = endTime - startTime;
+              console.log('Audio extraction complete for video ' + video.id + '. Processing time: ' + processingTime + 'ms');
+              resolve(outputPath);
+            } catch (error) {
+              console.error('Error extracting audio for video ' + video.id + ':', error);
+              reject(error);
+            }
+          });
+        }
+
+        async function generateThumbnails(video, thumbnailsDir, pythonScriptsDir) {
+          return new Promise(async (resolve, reject) => {
+            const videoId = video.id;
+            const thumbnailBaseName = videoId + '-thumb';
+            
+            console.log('Starting thumbnail generation for video ' + video.id + '...');
+            const startTime = Date.now();
+            
+            try {
+              // Call Python script for thumbnail generation using OpenCV
+              const pythonScript = path.join(pythonScriptsDir, 'generate_thumbnails.py');
+              const command = \`python "\${pythonScript}" "\${video.path}" "\${thumbnailsDir}" "\${thumbnailBaseName}"\`;
+              
+              console.log('Executing command:', command);
+              const { stdout, stderr } = await execAsync(command);
+              
+              if (stderr) {
+                console.error('Python stderr:', stderr);
+              }
+              
+              // Parse the output to get the list of generated thumbnails
+              // Find the JSON part in the output (last line)
+              const outputLines = stdout.trim().split('\\n');
+              const jsonOutput = outputLines[outputLines.length - 1];
+              const thumbnailPaths = JSON.parse(jsonOutput);
+              
+              const endTime = Date.now();
+              const processingTime = endTime - startTime;
+              console.log('Thumbnail generation complete for video ' + video.id + '. Processing time: ' + processingTime + 'ms');
+              resolve(thumbnailPaths);
+            } catch (error) {
+              console.error('Error generating thumbnails for video ' + video.id + ':', error);
+              reject(error);
+            }
+          });
+        }
+
+        async function processVideo(video, audioDir, thumbnailsDir, pythonScriptsDir) {
+          try {
+            const startTime = Date.now();
             const [audioPath, thumbnailPaths] = await Promise.all([
-              extractAudio(video, audioDir),
-              generateThumbnails(video, thumbnailsDir)
+              extractAudio(video, audioDir, pythonScriptsDir),
+              generateThumbnails(video, thumbnailsDir, pythonScriptsDir)
             ]);
             
             const endTime = Date.now();
@@ -132,17 +140,15 @@ export class MediaProcessor {
             throw error;
           }
         }
-        
+
         async function processBatch() {
-          const { videos, audioDir, thumbnailsDir } = workerData;
+          const { videos, audioDir, thumbnailsDir, pythonScriptsDir } = workerData;
           const results = [];
           
           for (const video of videos) {
             try {
-              const processedVideo = await processVideo(video, audioDir, thumbnailsDir);
+              const processedVideo = await processVideo(video, audioDir, thumbnailsDir, pythonScriptsDir);
               results.push(processedVideo);
-              
-              // Report progress back to main thread
               parentPort.postMessage({ type: 'progress', video: processedVideo });
             } catch (error) {
               console.error('Error processing video:', error);
@@ -163,7 +169,8 @@ export class MediaProcessor {
         workerData: {
           videos,
           audioDir: this.audioDir,
-          thumbnailsDir: this.thumbnailsDir
+          thumbnailsDir: this.thumbnailsDir,
+          pythonScriptsDir: this.pythonScriptsDir
         }
       });
 
