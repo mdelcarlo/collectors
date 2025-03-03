@@ -4,6 +4,8 @@ import React, { useEffect, useState } from 'react';
 import VideoList from './components/VideoList';
 import DragDropArea from './components/DragDropArea';
 import AudioList from './components/AudioList';
+import { Select } from './components/Select';
+
 import {
   MdCloudUpload,
   MdLink,
@@ -14,19 +16,36 @@ import {
   MdAutoFixHigh,
   MdVideocam,
   MdImportantDevices,
-  MdDialpad
+  MdDialpad,
+  MdTask,
+  MdGridView,
+  MdViewList
 } from 'react-icons/md';
 import { BiBot } from "react-icons/bi";
 
 import { motion } from 'framer-motion';
 import { Pair, Video, Audio } from 'src/types';
 import { Badge } from './components/Badge';
-import VideoItem from './components/VideoItem';
 import { calculateFps } from './utils/calculateFps';
 
 type TabType = 'paired' | 'unpaired' | 'processing' | 'processed';
 export type SortOption = 'date' | 'size' | 'name' | 'fps'
 export type GroupOption = 'day' | 'none';
+export type MenuSection = 'videos' | 'tasks';
+export type ViewMode = 'grid' | 'list' | 'timeline';
+
+const sortOptions = [
+  { value: 'none', label: 'Unsorted' },
+  { value: 'date', label: 'Sort by Date' },
+  { value: 'size', label: 'Sort by Size' },
+  { value: 'name', label: 'Sort by Name' },
+  { value: 'fps', label: 'Sort by FPS' },
+];
+
+const groupOptions = [
+  { value: 'none', label: 'No Grouping' },
+  { value: 'day', label: 'Group by Day' },
+];
 
 const App: React.FC = () => {
   const [pairs, setPairs] = useState<Pair[]>([]);
@@ -39,6 +58,8 @@ const App: React.FC = () => {
   const [groupBy, setGroupBy] = useState<GroupOption>('none');
   const [showActions, setShowActions] = useState(false);
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [activeSection, setActiveSection] = useState<MenuSection>('videos');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
 
   const filterVideos = (videos: Video[]) => {
     if (!searchTerm) return videos;
@@ -143,10 +164,10 @@ const App: React.FC = () => {
           path: video.audio,
           videoId: video.id
         }));
-        
+
         return [...prev, ...newAudios];
       });
-      
+
       // Remove from processing
       setProcessingVideos(prev =>
         prev.filter(id => !processedVideos.some(v => v.id === id))
@@ -173,6 +194,9 @@ const App: React.FC = () => {
     setIsLoading(true);
     await window.electronAPI.uploadVideos();
     setIsLoading(false);
+
+    setActiveSection('videos');
+    setActiveTab('paired');
   };
 
   // // Handle processing videos (replacing separate thumbnail and audio extraction)
@@ -183,7 +207,7 @@ const App: React.FC = () => {
 
   const handleProcessVideos = async (videoIds: string[]) => {
     setProcessingVideos(prev => [...prev, ...videoIds]);
-    
+
     // Use the new processMedia method that does both audio and thumbnails
     await window.electronAPI.processMedia(videoIds);
   };
@@ -200,18 +224,18 @@ const App: React.FC = () => {
 
   const getProcessingPairs = () => {
     return pairs.filter(pair =>
-      pair.video1.status === 'processing' || 
+      pair.video1.status === 'processing' ||
       pair.video2.status === 'processing'
     );
   };
-  
+
   const getRawPairs = () => {
     return pairs.filter(pair =>
       pair.video1.status === 'idle' &&
       pair.video2.status === 'idle'
     );
   };
-  
+
   const getProcessedPairs = () => {
     return pairs.filter(pair =>
       pair.video1.status === 'processed' &&
@@ -224,212 +248,289 @@ const App: React.FC = () => {
   const pairedProcessedVideos = sortPairs(filterPairs(getProcessedPairs()));
 
   return (
-    <div className="w-full bg-gray-50 dark:bg-gray-900 min-h-screen">
-      <header className="bg-white dark:bg-gray-800 p-4 mb-4 shadow-md flex justify-between items-center">
-        <div className="flex items-center gap-2 text-xl font-bold text-gray-800 dark:text-white">
-          <BiBot className="text-blue-600" size={30} /> Robotics Training Assistant
+    <div className="flex w-full bg-gray-50 dark:bg-gray-900 min-h-screen">
+      {/* Left wrapper containing sidebar and header */}
+      <div className="fixed left-0 flex flex-col w-64 h-screen bg-white dark:bg-gray-800">
+        {/* App title/logo section */}
+        <div className="p-4 max-h-14">
+          <div className="flex items-center gap-2 text-xl font-bold text-gray-800 dark:text-white">
+            <BiBot className="text-blue-600" size={30} />
+            <span className="text-sm">Robotics Training Assistant</span>
+          </div>
         </div>
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={handleUpload}
-          disabled={isLoading}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold p-3 rounded-lg shadow-md"
-        >
-          <MdCloudUpload />
-        </motion.button>
-      </header>
 
-
-      <main className="gap-8 p-4">
-        <nav className="flex gap-4 mb-4 border-b pb-2">
+        {/* Navigation menu */}
+        <nav className="flex-1 p-4 border-r dark:border-gray-700">
           <button
-            onClick={() => setActiveTab('paired')}
-            className={getTabClassName('paired')}
+            onClick={() => setActiveSection('videos')}
+            className={`w-full flex items-center gap-2 p-3 rounded-lg mb-2 ${activeSection === 'videos'
+              ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600'
+              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
           >
-            Paired Videos <Badge>{pairedVideos.length * 2} ({pairedVideos.length})</Badge>
+            <MdVideoLibrary size={20} />
+            <span>Videos</span>
           </button>
           <button
-            onClick={() => setActiveTab('unpaired')}
-            className={getTabClassName('unpaired')}
+            onClick={() => setActiveSection('tasks')}
+            className={`w-full flex items-center gap-2 p-3 rounded-lg mb-2 ${activeSection === 'tasks'
+              ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600'
+              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
           >
-            Unpaired Videos <Badge>{unpairedVideos.length}</Badge>
-          </button>
-          <button
-            onClick={() => setActiveTab('processing')}
-            className={getTabClassName('processing')}
-          >
-            Processing Videos <Badge>{pairedProcessingVideos.length * 2}</Badge>
-          </button>
-          <button
-            onClick={() => setActiveTab('processed')}
-            className={getTabClassName('processed')}
-          >
-            Processed Videos <Badge>{pairedProcessedVideos.length * 2}</Badge>
+            <MdTask size={20} />
+            <span>Tasks</span>
+            <span className="ml-auto text-xs bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded-full">
+              Soon
+            </span>
           </button>
         </nav>
-        <div className="flex gap-4 mb-4">
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search videos..."
-            className="border rounded-lg px-4 py-2 flex-1 bg-white dark:bg-gray-800 dark:text-white"
-          />
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortOption)}
-            className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white px-4 py-2 rounded-lg"
-          >
-            <option value="none">Unsorted</option>
-            <option value="date">Sort by Date</option>
-            <option value="size">Sort by Size</option>
-            <option value="name">Sort by Name</option>
-            <option value="fps">Sort by FPS</option>
-          </select>
-          <select
-            value={groupBy}
-            onChange={(e) => setGroupBy(e.target.value as GroupOption)}
-            className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white px-4 py-2 rounded-lg"
-          >
-            <option value="none">No Grouping</option>
-            <option value="day">Group by Day</option>
-          </select>
-        </div>
-        {activeTab === 'paired' && (
+      </div>
 
-          <motion.section
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg"
+      {/* Main Content */}
+      {/* Main content area */}
+      <div className="ml-64 flex-1 flex flex-col">
+        {/* Header */}
+        <header className="sticky top-0 z-10 bg-white dark:bg-gray-800 p-3 border-b dark:border-gray-700 flex justify-between items-center max-h-14">
+          <div className="text-md font-semibold text-gray-800 dark:text-white text-center flex-1">
+            {activeSection === 'videos' ? 'Videos' : 'Tasks'}
+          </div>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleUpload}
+            disabled={isLoading}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold p-3 rounded-lg shadow-md"
           >
-            <div className='flex justify-between items-center relative'>
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
-                <MdLink className="text-blue-600 dark:text-blue-500" />
-                Paired Videos
-              </h2>
-              <div
-                className="relative group"
-                onMouseEnter={() => setShowActions(true)}
-                onMouseLeave={() => setShowActions(false)}
+            <MdCloudUpload />
+          </motion.button>
+        </header>
+
+        {/* Main content */}
+        {activeSection === 'videos' && (
+          <main className="flex-1 p-4">
+            <nav className="flex gap-4 mb-4 border-b pb-2">
+              <button
+                onClick={() => setActiveTab('paired')}
+                className={getTabClassName('paired')}
               >
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                Paired Videos <Badge>{pairedVideos.length * 2} ({pairedVideos.length})</Badge>
+              </button>
+              <button
+                onClick={() => setActiveTab('unpaired')}
+                className={getTabClassName('unpaired')}
+              >
+                Unpaired Videos <Badge>{unpairedVideos.length}</Badge>
+              </button>
+              <button
+                onClick={() => setActiveTab('processing')}
+                className={getTabClassName('processing')}
+              >
+                Processing Videos <Badge>{pairedProcessingVideos.length * 2}</Badge>
+              </button>
+              <button
+                onClick={() => setActiveTab('processed')}
+                className={getTabClassName('processed')}
+              >
+                Processed Videos <Badge>{pairedProcessedVideos.length * 2}</Badge>
+              </button>
+            </nav>
+            <div className="flex gap-4 mb-4">
+              <div className="flex items-center gap-2 border rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 ${viewMode === 'grid'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300'
+                    }`}
                 >
-                  <MdMoreVert size={24} className="text-gray-600 dark:text-gray-300" />
-                </motion.button>
+                  <MdGridView size={20} />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 ${viewMode === 'list'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300'
+                    }`}
+                >
+                  <MdViewList size={20} />
+                </button>
+              </div>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search videos..."
+                className="border rounded-lg px-4 py-2 flex-1 bg-white dark:bg-gray-800 dark:text-white"
+              />
+              <div className="min-w-[180px]">
+                <Select
+                  value={sortOptions.find((o) => o.value === sortBy)}
+                  onChange={(option) => setSortBy(option.value as SortOption)}
+                  options={sortOptions}
+                />
+              </div>
 
-                {showActions && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="absolute right-0 top-8 w-64 bg-white dark:bg-gray-800 
-        rounded-lg shadow-lg py-2 z-50 border dark:border-gray-700 mt-2"
-                  >
-                    {/* Add a invisible bridge to prevent hover gap */}
-                    <div className="absolute -top-2 left-0 right-0 h-2" />
-
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleProcessVideos(
-                        [...pairs.flatMap(p => [p.video1.id, p.video2.id])]
-                      )}
-                      disabled={isLoading || processingVideos.length > 0}
-                      className="w-full flex items-center gap-2 px-4 py-2 hover:bg-gray-100 
-          dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                    >
-                      <MdAutoFixHigh className="text-blue-600" />
-                      Process All Videos
-                    </motion.button>
-                  </motion.div>
-                )}
+              <div className="min-w-[180px]">
+                <Select
+                  value={groupOptions.find((o) => o.value === groupBy)}
+                  onChange={(option) => setGroupBy(option.value as GroupOption)}
+                  options={groupOptions}
+                />
               </div>
             </div>
-            <VideoList
-              pairs={pairedVideos}
-              onUnpair={handleUnpairVideos}
-              onProcessVideo={handleProcessVideos}
-              processingVideos={processingVideos}
-              groupBy={groupBy}
-            />
-          </motion.section>
+            {activeTab === 'paired' && (
+
+              <motion.section
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg"
+              >
+                <div className='flex justify-between items-center relative'>
+                  <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
+                    <MdLink className="text-blue-600 dark:text-blue-500" />
+                    Paired Videos
+                  </h2>
+                  <div
+                    className="relative group"
+                    onMouseEnter={() => setShowActions(true)}
+                    onMouseLeave={() => setShowActions(false)}
+                  >
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      <MdMoreVert size={24} className="text-gray-600 dark:text-gray-300" />
+                    </motion.button>
+
+                    {showActions && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="absolute right-0 top-8 w-64 bg-white dark:bg-gray-800 
+        rounded-lg shadow-lg py-2 z-50 border dark:border-gray-700 mt-2"
+                      >
+                        {/* Add a invisible bridge to prevent hover gap */}
+                        <div className="absolute -top-2 left-0 right-0 h-2" />
+
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => handleProcessVideos(
+                            [...pairs
+                              .filter(p => p.video1.status === 'idle' && p.video2.status === 'idle')
+                              .flatMap(p => [p.video1.id, p.video2.id])
+                            ]
+                          )}
+                          disabled={isLoading || processingVideos.length > 0}
+                          className="w-full flex items-center gap-2 px-4 py-2 hover:bg-gray-100 
+          dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                        >
+                          <MdAutoFixHigh className="text-blue-600" />
+                          Process All Videos
+                        </motion.button>
+                      </motion.div>
+                    )}
+                  </div>
+                </div>
+                <VideoList
+                  pairs={pairedVideos}
+                  onUnpair={handleUnpairVideos}
+                  onProcessVideo={handleProcessVideos}
+                  processingVideos={processingVideos}
+                  groupBy={groupBy}
+                  viewMode={viewMode}
+                />
+              </motion.section>
+            )}
+            {activeTab === 'unpaired' && (
+              <motion.section
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg"
+              >
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
+                  <MdVideoCameraFront className="text-blue-600" />
+                  Unpaired Videos
+                </h2>
+                <DragDropArea
+                  videos={sortVideos(filterVideos(unpairedVideos))}
+                  onPair={handlePairVideos}
+                  processingVideos={processingVideos}
+                  groupBy={groupBy}
+                  onProcessVideo={handleProcessVideos}
+                  viewMode={viewMode}
+                />
+              </motion.section>)}
+
+            {activeTab === 'processing' && (
+              <motion.section
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg"
+              >
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
+                  <MdDialpad className="text-blue-600" />
+                  Processing Videos
+                </h2>
+                <VideoList
+                  pairs={pairedProcessingVideos}
+                  onUnpair={handleUnpairVideos}
+                  onProcessVideo={handleProcessVideos}
+                  processingVideos={processingVideos}
+                  groupBy={groupBy}
+                  viewMode={viewMode}
+                />
+              </motion.section>
+            )}
+
+            {activeTab === 'processed' && (
+              <motion.section
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg"
+              >
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
+                  <MdImportantDevices className="text-blue-600" />
+                  Processed Videos
+                </h2>
+                <VideoList
+                  pairs={pairedProcessedVideos}
+                  onUnpair={handleUnpairVideos}
+                  onProcessVideo={handleProcessVideos}
+                  processingVideos={processingVideos}
+                  groupBy={groupBy}
+                  viewMode={viewMode}
+                />
+              </motion.section>
+            )}
+          </main>)}
+
+        {activeSection === 'tasks' && (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center text-gray-500 dark:text-gray-400">
+              <MdTask size={48} className="mx-auto mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Tasks Coming Soon</h2>
+              <p>This feature is under development</p>
+            </div>
+          </div>
         )}
-        {activeTab === 'unpaired' && (
-          <motion.section
+
+
+        {pairedProcessingVideos.length > 0 && (
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg"
-          >
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
-              <MdVideoCameraFront className="text-blue-600" />
-              Unpaired Videos
-            </h2>
-            <DragDropArea
-              videos={sortVideos(filterVideos(unpairedVideos))}
-              onPair={handlePairVideos}
-              processingVideos={processingVideos}
-              groupBy={groupBy}
-              onProcessVideo={handleProcessVideos}
-            />
-          </motion.section>)}
-
-        {activeTab === 'processing' && (
-          <motion.section
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg"
-          >
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
-              <MdDialpad className="text-blue-600" />
-              Processing Videos
-            </h2>
-            <VideoList
-              pairs={pairedProcessingVideos}
-              onUnpair={handleUnpairVideos}
-              onProcessVideo={handleProcessVideos}
-              processingVideos={processingVideos}
-              groupBy={groupBy}
-            />
-          </motion.section>
-        )}
-
-        {activeTab === 'processed' && (
-          <motion.section
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg"
-          >
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
-              <MdImportantDevices className="text-blue-600" />
-              Processed Videos
-            </h2>
-            <VideoList
-              pairs={pairedProcessedVideos}
-              onUnpair={handleUnpairVideos}
-              onProcessVideo={handleProcessVideos}
-              processingVideos={processingVideos}
-              groupBy={groupBy}
-            />
-          </motion.section>
-        )}
-      </main>
-
-
-      {pairedProcessingVideos.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="fixed bottom-6 right-6 bg-gradient-to-r from-blue-600 to-blue-700 
+            className="fixed bottom-6 right-6 bg-gradient-to-r from-blue-600 to-blue-700 
              text-white p-4 rounded-lg shadow-lg flex items-center gap-2
              dark:from-blue-700 dark:to-blue-800"
-        >
-          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-          Processing {pairedProcessingVideos.length * 2} video(s)...
-        </motion.div>
-      )}
+          >
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+            Processing {pairedProcessingVideos.length * 2} video(s)...
+          </motion.div>
+        )}
+      </div>
     </div>
   );
 };

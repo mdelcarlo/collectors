@@ -67,6 +67,8 @@ const VideoModal = ({
     };
   }, [onClose]);
 
+  
+
   return ReactDOM.createPortal(
     <motion.div
       className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4"
@@ -133,7 +135,7 @@ const VideoItem: React.FC<VideoItemProps> = ({
           shadow-sm hover:shadow-md transition-shadow duration-200
           ${isDraggable ? 'cursor-grab' : ''}
           ${isProcessing ? 'opacity-50' : ''}
-          relative overflow-hidden
+          overflow-hidden
         `}
         draggable={isDraggable && !isVideoPlaying}
         onDragStart={isDraggable && onDragStart && !isVideoPlaying ? (e) => onDragStart(e, video.id) : undefined}
@@ -147,7 +149,7 @@ const VideoItem: React.FC<VideoItemProps> = ({
           >
             {video.path ? (
               <>
-                <div className="w-full h-full min-h-40">
+                <div className="w-full h-full min-h-40 max-h-40">
                   <video
                     src={`file://${video.path}`}
                     className="w-full h-full object-cover"

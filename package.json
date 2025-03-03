@@ -43,6 +43,7 @@
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@headlessui/react": "^2.2.0",
     "@types/uuid": "^10.0.0",
     "electron-squirrel-startup": "^1.0.1",
     "electron-store": "^10.0.1",
