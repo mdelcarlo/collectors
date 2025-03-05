@@ -1,11 +1,8 @@
 import path from 'path';
 import fs from 'fs/promises';
-import { exec } from 'child_process';
 import { app } from 'electron';
 import { Worker } from 'worker_threads';
-import { promisify } from 'util';
 
-const execAsync = promisify(exec);
 
 export class MediaProcessor {
   private outputDir: string;
@@ -47,75 +44,6 @@ export class MediaProcessor {
         const { exec } = require('child_process');
         const util = require('util');
         const execAsync = util.promisify(exec);
-        
-        async function extractAudio(video, audioDir, pythonScriptsDir) {
-          return new Promise(async (resolve, reject) => {
-            const outputPath = path.join(audioDir, video.id + '-audio.mp3');
-            
-            console.log('Starting audio extraction for video ' + video.id + '...');
-            const startTime = Date.now();
-            
-            try {
-              // Call Python script for audio extraction using MoviePy
-              const pythonScript = path.join(pythonScriptsDir, 'extract_audio.py');
-              const command = \`python "\${pythonScript}" "\${video.path}" "\${outputPath}"\`;
-              
-              console.log('Executing command:', command);
-              const { stdout, stderr } = await execAsync(command);
-              
-              if (stderr) {
-                console.error('Python stderr:', stderr);
-              }
-              
-              console.log('Python stdout:', stdout);
-              
-              const endTime = Date.now();
-              const processingTime = endTime - startTime;
-              console.log('Audio extraction complete for video ' + video.id + '. Processing time: ' + processingTime + 'ms');
-              resolve(outputPath);
-            } catch (error) {
-              console.error('Error extracting audio for video ' + video.id + ':', error);
-              reject(error);
-            }
-          });
-        }
-
-        async function generateThumbnails(video, thumbnailsDir, pythonScriptsDir) {
-          return new Promise(async (resolve, reject) => {
-            const videoId = video.id;
-            const thumbnailBaseName = videoId + '-thumb';
-            
-            console.log('Starting thumbnail generation for video ' + video.id + '...');
-            const startTime = Date.now();
-            
-            try {
-              // Call Python script for thumbnail generation using OpenCV
-              const pythonScript = path.join(pythonScriptsDir, 'generate_thumbnails.py');
-              const command = \`python "\${pythonScript}" "\${video.path}" "\${thumbnailsDir}" "\${thumbnailBaseName}"\`;
-              
-              console.log('Executing command:', command);
-              const { stdout, stderr } = await execAsync(command);
-              
-              if (stderr) {
-                console.error('Python stderr:', stderr);
-              }
-              
-              // Parse the output to get the list of generated thumbnails
-              // Find the JSON part in the output (last line)
-              const outputLines = stdout.trim().split('\\n');
-              const jsonOutput = outputLines[outputLines.length - 1];
-              const thumbnailPaths = JSON.parse(jsonOutput);
-              
-              const endTime = Date.now();
-              const processingTime = endTime - startTime;
-              console.log('Thumbnail generation complete for video ' + video.id + '. Processing time: ' + processingTime + 'ms');
-              resolve(thumbnailPaths);
-            } catch (error) {
-              console.error('Error generating thumbnails for video ' + video.id + ':', error);
-              reject(error);
-            }
-          });
-        }
 
         async function processVideo(video, audioDir, thumbnailsDir, pythonScriptsDir) {
           try {
