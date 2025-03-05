@@ -102,7 +102,7 @@ function setupIpcHandlers(mainWindow: BrowserWindow) {
   ipcMain.handle('upload-videos', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile', 'multiSelections'],
-      filters: [{ name: 'Videos', extensions: ['mp4', 'avi', 'mov', 'mkv'] }]
+      filters: [{ name: 'Videos', extensions: ['mp4', 'avi', 'mov', 'mkv', 'insv'] }]
     });
 
     if (!result.canceled && result.filePaths.length > 0) {

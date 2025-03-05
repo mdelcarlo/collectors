@@ -120,18 +120,32 @@ export class MediaProcessor {
         async function processVideo(video, audioDir, thumbnailsDir, pythonScriptsDir) {
           try {
             const startTime = Date.now();
-            const [audioPath, thumbnailPaths] = await Promise.all([
-              extractAudio(video, audioDir, pythonScriptsDir),
-              generateThumbnails(video, thumbnailsDir, pythonScriptsDir)
-            ]);
+
+            const outputPath = path.join(audioDir);
+
+            try {
+              const pythonScript = path.join(pythonScriptsDir, 'create_sample_video.py');
+              const command = \`python "\${pythonScript}" -i '\${video.path}' -o "\${outputPath}" \`;
+              console.log('Creating sample video...');
+              const { stdout, stderr } = await execAsync(command);
+              
+              if (stderr) {
+                  console.error('Python stderr:', stderr);
+              }
+              
+              console.log('Sample video created:', stdout);
+            } catch (error) {
+              console.error('Error creating sample video:', error);
+              throw error;
+            }
+
             
             const endTime = Date.now();
             const processingTime = endTime - startTime;
             
             return {
               ...video,
-              audio: audioPath,
-              thumbnails: thumbnailPaths,
+              preview: outputPath + 'create_sample_video.py',
               processingTime,
               processed: true
             };
