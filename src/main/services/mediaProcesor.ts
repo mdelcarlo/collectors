@@ -145,7 +145,7 @@ export class MediaProcessor {
             
             return {
               ...video,
-              preview: outputPath + 'create_sample_video.py',
+              preview: outputPath + '/sample_video.mp4',
               processingTime,
               processed: true
             };
