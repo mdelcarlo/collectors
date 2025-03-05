@@ -1,6 +1,3 @@
-Here’s your Markdown file with added styling for better readability and structure:
-
-```md
 # 🚀 Robotics Contributors  
 *An Electron application for video processing and management, designed for robotics contributors.*
 
