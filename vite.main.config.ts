@@ -16,8 +16,6 @@ export default defineConfig({
       external: [
         'electron',
         'electron-devtools-installer',
-        'fluent-ffmpeg',
-        '@ffmpeg-installer/ffmpeg'
       ]
     }
   }

@@ -16,10 +16,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('unpair-videos', pairId),
 
   // Video processing
-  generateThumbnails: (videoIds: string[]) =>
-    ipcRenderer.invoke('generate-thumbnails', videoIds),
-  extractAudio: (videoIds: string[]) =>
-    ipcRenderer.invoke('extract-audio', videoIds),
   processComplete: (videoIds: string[]) =>
     ipcRenderer.invoke('process-complete', videoIds),
   processMedia: (videoIds: string[]) =>
@@ -28,10 +24,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Event listeners
   onVideosUpdated: (callback: FunctionConstructor) =>
     ipcRenderer.on('videos-updated', (_event, data) => callback(data)),
-  onThumbnailsGenerated: (callback: FunctionConstructor) =>
-    ipcRenderer.on('thumbnails-generated', (_event, data) => callback(data)),
-  onAudioExtracted: (callback: FunctionConstructor) =>
-    ipcRenderer.on('audio-extracted', (_event, data) => callback(data)),
   onProcessCompleted: (callback: FunctionConstructor) =>
     ipcRenderer.on('process-complete', (_event, data) => callback(data)),
   onMediaProcessed: (callback: FunctionConstructor) =>

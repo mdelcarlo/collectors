@@ -10,11 +10,8 @@ declare global {
             getAllVideos: () => Promise<any>;
             pairVideos: (video1Id: string, video2Id: string) => Promise<any>;
             unpairVideos: (pairId: string) => Promise<any>;
-            generateThumbnails: (videoIds: string[]) => Promise<any>;
-            extractAudio: (videoIds: string[]) => Promise<any>;
+            processMedia: (videoIds: string[]) => Promise<any>;
             onVideosUpdated: (callback: FunctionConstructor) => void;
-            onThumbnailsGenerated: (callback: FunctionConstructor) => void;
-            onAudioExtracted: (callback: FunctionConstructor) => void;
             removeAllListeners: (channel: string) => void;
             processComplete: (callback: FunctionConstructor) => void;
             onProcessCompleted: (callback: FunctionConstructor) => void;

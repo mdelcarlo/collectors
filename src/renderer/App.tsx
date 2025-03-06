@@ -11,10 +11,8 @@ import {
   MdLink,
   MdMoreVert,
   MdVideoCameraFront,
-  MdSmartToy,
   MdVideoLibrary,
   MdAutoFixHigh,
-  MdVideocam,
   MdImportantDevices,
   MdDialpad,
   MdTask,
@@ -112,19 +110,6 @@ const App: React.FC = () => {
     });
   };
 
-  const groupVideosByDay = (videos: Video[]) => {
-    if (groupBy !== 'day') return { ungrouped: videos };
-
-    return videos.reduce((groups, video) => {
-      const date = new Date(video.createdAt).toLocaleDateString();
-      if (!groups[date]) {
-        groups[date] = [];
-      }
-      groups[date].push(video);
-      return groups;
-    }, {} as Record<string, Video[]>);
-  };
-
   // Load initial data
   useEffect(() => {
     const loadData = async () => {
@@ -149,13 +134,6 @@ const App: React.FC = () => {
       );
     });
 
-    window.electronAPI.onAudioExtracted((audios: Audio[]) => {
-      setExtractedAudios(prev => [...prev, ...audios]);
-      setProcessingVideos(prev =>
-        prev.filter(id => !audios.some(a => a.id === id))
-      );
-    });
-
     window.electronAPI.onMediaProcessed((processedVideos: any[]) => {
       // Update the extracted audios
       setExtractedAudios(prev => {
@@ -177,8 +155,6 @@ const App: React.FC = () => {
     // Cleanup listeners on unmount
     return () => {
       window.electronAPI.removeAllListeners('videos-updated');
-      window.electronAPI.removeAllListeners('thumbnails-generated');
-      window.electronAPI.removeAllListeners('audio-extracted');
     };
   }, []);
 

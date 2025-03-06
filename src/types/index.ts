@@ -11,7 +11,7 @@ export interface Video {
   paired?: boolean;
   pairId?: string | null;
   size: number;
-  fps?: string;
+  fps?: number;
   processingTime?: number;
   processed?: boolean;
   status: VideoStatus;

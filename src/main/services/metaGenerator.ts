@@ -1,19 +1,16 @@
 import path from 'path';
 import fs from 'fs/promises';
-import ffmpeg from 'fluent-ffmpeg';
-import ffmpegPath from '@ffmpeg-installer/ffmpeg';
 import { app } from 'electron';
 import { Worker } from 'worker_threads';
 
-// Set ffmpeg path
-ffmpeg.setFfmpegPath(ffmpegPath.path);
-
 export class MetaGenerator {
   private outputDir: string;
+  private pythonScriptsDir: string;
 
   constructor() {
     // Create thumbnails folder in app data directory
     this.outputDir = path.join(app.getPath('userData'), 'thumbnails');
+    this.pythonScriptsDir = path.join(app.getAppPath(), 'python');
     this.ensureOutputDirExists();
   }
 
@@ -27,6 +24,7 @@ export class MetaGenerator {
 
   /**
    * Generate metadata for multiple videos concurrently using worker threads
+   * that call a Python script with OpenCV
    */
   async generateBatch(videos: any[]): Promise<any[]> {
     return new Promise((resolve) => {
@@ -34,54 +32,42 @@ export class MetaGenerator {
       const worker = new Worker(`
         const { parentPort, workerData } = require('worker_threads');
         const path = require('path');
-        const fs = require('fs');
-        const ffmpeg = require('fluent-ffmpeg');
-        const ffmpegPath = require('@ffmpeg-installer/ffmpeg');
+        const { exec } = require('child_process');
+        const util = require('util');
+        const execAsync = util.promisify(exec);
         
-        ffmpeg.setFfmpegPath(ffmpegPath.path);
-        
-        async function generateThumbnail(video, outputDir) {
-          return new Promise((resolve, reject) => {
-            const outputPath = path.join(outputDir, \`\${video.id}-thumbnail.jpg\`);
+        async function getVideoFps(video, pythonScriptsDir) {
+          try {
+            const pythonScript = path.join(pythonScriptsDir, 'extract_fps.py');
+            const command = \`python "\${pythonScript}" -i "\${video.path}"\`;
             
-            ffmpeg(video.path)
-              .screenshots({
-                timestamps: ['5%'],
-                filename: \`\${video.id}-thumbnail.jpg\`,
-                folder: outputDir,
-                size: '320x240'
-              })
-              .on('end', () => {
-                resolve(outputPath);
-              })
-              .on('error', (err) => {
-                console.error('Error generating thumbnail:', err);
-                reject(err);
-              });
-          });
-        }
-        
-        async function getVideoFps(video) {
-          return new Promise((resolve, reject) => {
-            ffmpeg.ffprobe(video.path, (err, metadata) => {
-              if (err) {
-                console.error('Error getting video FPS:', err);
-                reject(err);
-              } else {
-                const fps = metadata.streams[0].r_frame_rate;
-                resolve(fps);
-              }
-            });
-          });
+            const { stdout, stderr } = await execAsync(command);
+            
+            if (stderr) {
+              console.error('Python stderr:', stderr);
+            }
+            
+            // Parse the JSON output from the Python script
+            const result = JSON.parse(stdout);
+            
+            if (result.error) {
+              throw new Error(result.error);
+            }
+            
+            return result.fps;
+          } catch (error) {
+            console.error('Error getting video FPS:', error);
+            throw error;
+          }
         }
         
         async function processBatch() {
-          const { videos, outputDir } = workerData;
+          const { videos, pythonScriptsDir } = workerData;
           const results = [];
           
           for (const video of videos) {
             try {
-              const fps = await getVideoFps(video);
+              const fps = await getVideoFps(video, pythonScriptsDir);
               const processedVideo = {
                 ...video,
                 fps
@@ -94,7 +80,7 @@ export class MetaGenerator {
               console.error('Error processing video:', error);
               parentPort.postMessage({ 
                 type: 'error', 
-                videoId: video.id, 
+                videoId: video.id || path.basename(video.path), 
                 error: error.message 
               });
             }
@@ -108,7 +94,7 @@ export class MetaGenerator {
         eval: true,
         workerData: {
           videos,
-          outputDir: this.outputDir
+          pythonScriptsDir: this.pythonScriptsDir
         }
       });
 

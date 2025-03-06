@@ -19,7 +19,6 @@ Before you begin, ensure you have the following installed:
 - **Node.js** (v16 or higher recommended)  
 - **npm** (v8 or higher)  
 - **Python** (v3.8 or higher)  
-- **FFmpeg** (for video processing)  
 
 ### 🐍 Python Dependencies  
 Ensure you install the necessary Python dependencies before running the application.  
@@ -46,7 +45,7 @@ This will launch the application with **hot reloading** enabled.
 ---
 
 ## 📦 Creating an Executable  
-To create a distributable package for your platform:  
+To create a distributable package with all dependencies:  
 ```sh
 npm run make
 ```

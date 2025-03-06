@@ -32,14 +32,3 @@ const pipCmd = platform === 'win32'
 execSync(`${pipCmd} install moviepy opencv-python numpy`, { stdio: 'inherit' });
 
 console.log('Python dependencies bundled successfully!');
-
-// At the end of the script
-const ffmpegSrc = path.join(__dirname, '../node_modules/@ffmpeg-installer');
-const ffmpegDest = path.join(appDir, 'node_modules/@ffmpeg-installer');
-
-// Create directory if it doesn't exist
-fs.mkdirSync(path.dirname(ffmpegDest), { recursive: true });
-
-// Copy the entire directory recursively
-fs.cpSync(ffmpegSrc, ffmpegDest, { recursive: true });
-console.log('FFmpeg binaries copied successfully!');

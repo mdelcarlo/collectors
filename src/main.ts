@@ -3,8 +3,6 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
 import fs from 'fs/promises';
-import { ThumbnailGenerator } from './main/services/thumbnailGenerator';
-import { AudioExtractor } from './main/services/audioExtractor';
 import { VideoMatcher } from './main/services/videoMatcher';
 import Store from 'electron-store';
 import { MetaGenerator } from './main/services/metaGenerator';
@@ -43,9 +41,7 @@ clearStore()
 
 
 // Initialize services
-const thumbnailGenerator = new ThumbnailGenerator();
 const metaGenerator = new MetaGenerator();
-const audioExtractor = new AudioExtractor();
 const videoMatcher = new VideoMatcher();
 const mediaProcessor = new MediaProcessor();
 
@@ -176,63 +172,6 @@ function setupIpcHandlers(mainWindow: BrowserWindow) {
     }
 
     return null;
-  });
-
-  // Generate thumbnails (run in separate process)
-  ipcMain.handle('generate-thumbnails', async (_, videoIds) => {
-    const pairs = store.get('pairs') as any[];
-    const unpaired = store.get('unpairedVideos') as any[];
-    const allVideos = [
-      ...pairs.flatMap(p => [p.video1, p.video2]),
-      ...unpaired
-    ];
-
-    // Filter to only process requested videos
-    const videosToProcess = allVideos.filter(v => videoIds.includes(v.id));
-
-    // Process thumbnails in background
-    const results = await thumbnailGenerator.generateBatch(videosToProcess);
-
-    // Update thumbnails in store
-    const updatedPairs = pairs.map(pair => ({
-      ...pair,
-      video1: results.find(r => r.id === pair.video1.id) || pair.video1,
-      video2: results.find(r => r.id === pair.video2.id) || pair.video2
-    }));
-
-    const updatedUnpaired = unpaired.map(video =>
-      results.find(r => r.id === video.id) || video
-    );
-
-    store.set('pairs', updatedPairs);
-    store.set('unpairedVideos', updatedUnpaired);
-
-    // Notify renderer
-    mainWindow.webContents.send('thumbnails-generated', results);
-
-    return results;
-  });
-
-  // Extract audio (run in separate process)
-  ipcMain.handle('extract-audio', async (_, videoIds) => {
-    const pairs = store.get('pairs') as any[];
-    const unpaired = store.get('unpairedVideos') as any[];
-    const allVideos = [
-      ...pairs.flatMap(p => [p.video1, p.video2]),
-      ...unpaired
-    ];
-
-    // Filter to only process requested videos
-    const videosToProcess = allVideos.filter(v => videoIds.includes(v.id));
-
-    // Process audio in background
-    const results = await audioExtractor.extractBatch(videosToProcess);
-    store.set('extractedAudios', results);
-
-    // Notify renderer
-    mainWindow.webContents.send('audio-extracted', results);
-
-    return results;
   });
 
   ipcMain.handle('process-media', async (_, videoIds) => {
