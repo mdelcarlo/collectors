@@ -11,6 +11,14 @@ import { MetaGenerator } from './main/services/metaGenerator';
 import { MediaProcessor } from './main/services/mediaProcesor';
 import { VideoStatus } from './types';
 
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 
 // Initialize store for persistent data
 const store = new Store({
@@ -99,7 +107,7 @@ app.on('window-all-closed', () => {
 // Set up all IPC handlers
 function setupIpcHandlers(mainWindow: BrowserWindow) {
   // Handle video upload
-  ipcMain.handle('upload-videos', async () => {
+  ipcMain.handle('upload-videos', async (_, autoMatchVideos = false) => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile', 'multiSelections'],
       filters: [{ name: 'Videos', extensions: ['mp4', 'avi', 'mov', 'mkv', 'insv'] }]
@@ -130,6 +138,21 @@ function setupIpcHandlers(mainWindow: BrowserWindow) {
 
       // Generate metadata for new videos
       const videosWithMeta = await metaGenerator.generateBatch(newVideos);
+
+
+      if (!autoMatchVideos) {
+        const remainingUnpaired = [...existingUnpaired, ...videosWithMeta];
+        store.set('unpairedVideos', remainingUnpaired);
+
+        // Notify renderer
+        mainWindow.webContents.send('videos-updated', {
+          pairs: existingPairs,
+          unpairedVideos: remainingUnpaired
+        });
+
+        return { pairs: existingPairs, unpaired: remainingUnpaired };
+      }
+
 
       // Only try to match new videos with existing unpaired videos
       const { pairs: newPairs, unpaired: remainingUnpaired } = await videoMatcher.matchVideos(
@@ -227,13 +250,13 @@ function setupIpcHandlers(mainWindow: BrowserWindow) {
 
       let updatedPairs = pairs.map(pair => ({
         ...pair,
-        video1: { 
-          ...pair.video1, 
-          status: videoIds.includes(pair.video1.id) ? 'processing' : pair.video1.status 
+        video1: {
+          ...pair.video1,
+          status: videoIds.includes(pair.video1.id) ? 'processing' : pair.video1.status
         },
-        video2: { 
-          ...pair.video2, 
-          status: videoIds.includes(pair.video2.id) ? 'processing' : pair.video2.status 
+        video2: {
+          ...pair.video2,
+          status: videoIds.includes(pair.video2.id) ? 'processing' : pair.video2.status
         }
       }));
 

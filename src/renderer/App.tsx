@@ -196,14 +196,8 @@ const App: React.FC = () => {
     setIsLoading(false);
 
     setActiveSection('videos');
-    setActiveTab('paired');
+    setActiveTab('unpaired');
   };
-
-  // // Handle processing videos (replacing separate thumbnail and audio extraction)
-  // const handleProcessVideos = async (videoIds: string[]) => {
-  //   setProcessingVideos(prev => [...prev, ...videoIds]);
-  //   await window.electronAPI.processComplete(videoIds);
-  // };
 
   const handleProcessVideos = async (videoIds: string[]) => {
     setProcessingVideos(prev => [...prev, ...videoIds]);
