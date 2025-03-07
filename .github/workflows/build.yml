@@ -47,14 +47,14 @@ jobs:
           name: robotics-contributors
           path: out/make/
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ env.VERSION }}
-          name: Release v${{ env.VERSION }}
-          body: "Automated release of robotics-contributors v${{ env.VERSION }}"
-          draft: false
-          prerelease: false
-          files: out/make/**
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Create GitHub Release
+      #   uses: softprops/action-gh-release@v2
+      #   with:
+      #     tag_name: v${{ env.VERSION }}
+      #     name: Release v${{ env.VERSION }}
+      #     body: "Automated release of robotics-contributors v${{ env.VERSION }}"
+      #     draft: false
+      #     prerelease: false
+      #     files: out/make/**
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
