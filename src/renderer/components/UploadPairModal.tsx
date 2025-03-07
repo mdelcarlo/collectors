@@ -1,9 +1,14 @@
 import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { MdCloudUpload, MdClose, MdRemoveRedEye, MdVisibilityOff } from 'react-icons/md';
+import { MdCloudUpload, MdClose, MdRemoveRedEye, MdVisibilityOff, MdContentCopy } from 'react-icons/md';
 import { Video } from 'src/types';
 import VideoItem from './VideoItem';
 import VideoPreview from './VideoPreview';
+
+const truncateText = (text: string, maxLength: number = 28): string => {
+  if (!text) return '';
+  return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
+};
 
 interface UploadPairModalProps {
   isOpen: boolean;
@@ -21,7 +26,7 @@ interface UploadPairModalProps {
 
 const formatTime = (timeInSeconds: number): string => {
   const totalSeconds = Math.floor(timeInSeconds);
-  
+
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
@@ -45,9 +50,16 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
   const [isSync, setIsSync] = useState(false);
   const [isSufficientLighting, setIsSufficientLighting] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [copiedChecksum, setCopiedChecksum] = useState<string | null>(null);
 
   // Mock checksums that would be calculated in a real implementation
-  
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedChecksum(text);
+    setTimeout(() => setCopiedChecksum(null), 2000);
+  };
+
+
   const { video1, video2 } = pair;
   const processingTime = video1.processingTime + video2.processingTime;
 
@@ -109,34 +121,23 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
                 <div className="flex-1">
                   <div className="mb-3">
                     <p className="text-gray-800 dark:text-gray-200 font-medium truncate" title={video1.name}>
-                      {video1.name}
+                      {truncateText(video1.name)}
                     </p>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">Checksum: {video1.checksum}</p>
-                    <AnimatePresence>
-                      {showPreview && (
-                        <motion.div
-                          key="video1Preview"
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          transition={{ duration: 0.3 }}
-                        >
-                          <VideoPreview preview={video1.preview} title={video1.name} />
-                        </motion.div>
+                    <div className="text-gray-500 dark:text-gray-400 text-sm flex items-center">
+                      <span className="truncate max-w-[180px]" title={video1.checksum}>
+                        Checksum: {truncateText(video1.checksum, 16)}
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard(video1.checksum)}
+                        className="ml-2 text-gray-500 hover:text-blue-500 focus:outline-none"
+                        title="Copy checksum"
+                      >
+                        <MdContentCopy className="w-4 h-4" />
+                      </button>
+                      {copiedChecksum === video1.checksum && (
+                        <span className="ml-2 text-xs text-green-500">Copied!</span>
                       )}
-                    </AnimatePresence>
-                  </div>
-                </div>
-              )}
-
-              {/* Right column - Video 2 */}
-              {video2 && (
-                <div className="flex-1">
-                  <div className="mb-3">
-                    <p className="text-gray-800 dark:text-gray-200 font-medium truncate" title={video2.name}>
-                      {video2.name}
-                    </p>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">Checksum: {video2.checksum}</p>
+                    </div>
                     <AnimatePresence>
                       {showPreview && (
                         <motion.div
@@ -153,11 +154,50 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* Right column - Video 2 */}
+              {video2 && (
+                <div className="flex-1">
+                  <div className="mb-3">
+                    <p className="text-gray-800 dark:text-gray-200 font-medium truncate" title={video2.name}>
+                      {truncateText(video2.name)}
+                    </p>
+                    <div className="text-gray-500 dark:text-gray-400 text-sm flex items-center">
+                      <span className="truncate max-w-[180px]" title={video2.checksum}>
+                        Checksum: {truncateText(video2.checksum, 16)}
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard(video2.checksum)}
+                        className="ml-2 text-gray-500 hover:text-blue-500 focus:outline-none"
+                        title="Copy checksum"
+                      >
+                        <MdContentCopy className="w-4 h-4" />
+                      </button>
+                      {copiedChecksum === video2.checksum && (
+                        <span className="ml-2 text-xs text-green-500">Copied!</span>
+                      )}
+                    </div>
+                    <AnimatePresence>
+                      {showPreview && (
+                        <motion.div
+                          key="video1Preview"
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.3 }}
+                        >
+                          <VideoPreview preview={video1.preview} title={video1.name} />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Information below both videos */}
             {(video1 && video1.duration) && (
-              <div className="mt-4 border-t pt-4 border-gray-200 dark:border-gray-700">
+              <div className="pt-4 border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200">
                 <p className="text-gray-700 dark:text-gray-300 font-medium">
                   Net Task Time: {formatTime(video1.duration)}
                 </p>
