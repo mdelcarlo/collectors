@@ -45,7 +45,8 @@ const metaGenerator = new MetaGenerator();
 const videoMatcher = new VideoMatcher();
 const mediaProcessor = new MediaProcessor();
 
-// Create the browser window.
+const isDev = process.env.NODE_ENV === 'development';
+
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 1200,
@@ -58,14 +59,10 @@ const createWindow = () => {
     },
   });
 
-
-  // Load the index.html file
-  if (process.env.NODE_ENV === 'development') {
-    // Dev - use Vite dev server
+  if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
   } else {
-    // Production - use built files
-    mainWindow.loadFile(path.join(__dirname, '../../renderer/index.html'));
+    mainWindow.loadFile(path.join(__dirname, "../../../dist/renderer/index.html"));
   }
 
   return mainWindow;

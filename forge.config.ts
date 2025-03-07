@@ -14,7 +14,8 @@ const config: ForgeConfig = {
     },
     extraResource: [
       "./python",  // Include Python scripts
-      "./node_modules/electron-squirrel-startup"
+      "./node_modules/electron-squirrel-startup",
+      './dist'
     ],
   },
   rebuildConfig: {},
