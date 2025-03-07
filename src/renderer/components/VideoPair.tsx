@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import VideoItem from './VideoItem';
 import { Pair } from 'src/types';
 import { MdLinkOff, MdAutoFixHigh, MdPlayCircleFilled, MdCloudUpload } from 'react-icons/md';
@@ -7,11 +7,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { calculateFps } from '../utils/calculateFps';
 import { BiUnlink } from 'react-icons/bi';
 import UploadPairModal from './UploadPairModal';
+import VideoProgressBar from './VideoProgressBar';
 
 interface VideoPairProps {
   pair: Pair;
   onUnpair: (pairId: string) => void;
-  isProcessing: boolean;
   onProcess: (pair: Pair) => void;
   viewMode: ViewMode;
 }
@@ -19,7 +19,6 @@ interface VideoPairProps {
 const VideoPair: React.FC<VideoPairProps> = ({
   pair,
   onUnpair,
-  isProcessing,
   onProcess,
   viewMode,
 }) => {
@@ -36,7 +35,6 @@ const VideoPair: React.FC<VideoPairProps> = ({
     setActiveVideo(null);
   };
 
-
   const handleUpload = (data: {
     video1: File | null;
     video2: File | null;
@@ -50,7 +48,7 @@ const VideoPair: React.FC<VideoPairProps> = ({
   };
 
   const isProcessedPair = pair.video1.status === 'processed' && pair.video2.status === 'processed';
-
+  const isProcessing = pair.video1.status === 'processing' || pair.video2.status === 'processing';
   if (viewMode === 'grid') {
     return (
       <>
@@ -105,6 +103,13 @@ const VideoPair: React.FC<VideoPairProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Progress bar for processing */}
+            {isProcessing && (
+              <div className="px-4 pb-3 pt-2">
+                <VideoProgressBar pair={pair} />
+              </div>
+            )}
           </div>
 
           {/* Action bar */}
@@ -180,7 +185,7 @@ const VideoPair: React.FC<VideoPairProps> = ({
             )}
           </AnimatePresence>
         </motion.div>
-        {isProcessedPair &&<UploadPairModal
+        {isProcessedPair && <UploadPairModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           onSubmit={handleUpload}
@@ -251,6 +256,14 @@ const VideoPair: React.FC<VideoPairProps> = ({
                 Upload
               </motion.button>)}
             </div>
+
+            {/* Progress bar for processing in list view */}
+            {isProcessing && (
+              <div className="mb-4">
+                <VideoProgressBar pair={pair} />
+              </div>
+            )}
+
             <div className={`${showCompare ? 'grid grid-cols-1 sm:grid-cols-2 gap-2' : 'space-y-3'}`}>
               <div
                 className={`
