@@ -16,16 +16,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('unpair-videos', pairId),
 
   // Video processing
-  processComplete: (videoIds: string[]) =>
-    ipcRenderer.invoke('process-complete', videoIds),
   processMedia: (videoIds: string[]) =>
     ipcRenderer.invoke('process-media', videoIds),
 
   // Event listeners
   onVideosUpdated: (callback: FunctionConstructor) =>
     ipcRenderer.on('videos-updated', (_event, data) => callback(data)),
-  onProcessCompleted: (callback: FunctionConstructor) =>
-    ipcRenderer.on('process-complete', (_event, data) => callback(data)),
   onMediaProcessed: (callback: FunctionConstructor) =>
     ipcRenderer.on('media-processed', (_event, data) => callback(data)),
   // Remove event listeners

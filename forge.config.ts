@@ -9,7 +9,13 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
 const config: ForgeConfig = {
   packagerConfig: {
-    asar: true,
+    asar: {
+      unpack: "*.{node,py}"  // Unpack native modules and Python files
+    },
+    extraResource: [
+      "./python",  // Include Python scripts
+      "./node_modules/electron-squirrel-startup"
+    ],
   },
   rebuildConfig: {},
   makers: [new MakerSquirrel({}), new MakerZIP({}, ['darwin']), new MakerRpm({}), new MakerDeb({})],

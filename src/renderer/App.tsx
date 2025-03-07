@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import VideoList from './components/VideoList';
 import DragDropArea from './components/DragDropArea';
-import AudioList from './components/AudioList';
 import { Select } from './components/Select';
 
 import {
@@ -49,7 +48,6 @@ const App: React.FC = () => {
   const [pairs, setPairs] = useState<Pair[]>([]);
   const [unpairedVideos, setUnpairedVideos] = useState<Video[]>([]);
   const [processingVideos, setProcessingVideos] = useState<string[]>([]);
-  const [extractedAudios, setExtractedAudios] = useState<Audio[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<TabType>('paired');
   const [sortBy, setSortBy] = useState<SortOption>('date');
@@ -118,7 +116,6 @@ const App: React.FC = () => {
       console.log('data: ', data);
       setPairs(data.pairs || []);
       setUnpairedVideos(data.unpairedVideos || []);
-      setExtractedAudios(data.extractedAudios || []);
       setIsLoading(false);
     };
 
@@ -135,16 +132,6 @@ const App: React.FC = () => {
     });
 
     window.electronAPI.onMediaProcessed((processedVideos: any[]) => {
-      // Update the extracted audios
-      setExtractedAudios(prev => {
-        const newAudios = processedVideos.map(video => ({
-          id: video.id,
-          path: video.audio,
-          videoId: video.id
-        }));
-
-        return [...prev, ...newAudios];
-      });
 
       // Remove from processing
       setProcessingVideos(prev =>

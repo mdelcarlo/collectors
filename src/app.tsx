@@ -2,6 +2,7 @@ import * as React from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css'; // Import Tailwind CSS
 import App from './renderer/App';
+import ErrorBoundary from './renderer/components/ErrorBoundary';
 
 declare global {
     interface Window {
@@ -11,19 +12,29 @@ declare global {
             pairVideos: (video1Id: string, video2Id: string) => Promise<any>;
             unpairVideos: (pairId: string) => Promise<any>;
             processMedia: (videoIds: string[]) => Promise<any>;
-            onVideosUpdated: (callback: FunctionConstructor) => void;
+            onVideosUpdated: (callback: (data: any) => void) => void;
             removeAllListeners: (channel: string) => void;
-            processComplete: (callback: FunctionConstructor) => void;
-            onProcessCompleted: (callback: FunctionConstructor) => void;
-            onMediaProcessed: (callback: FunctionConstructor) => void;
+            onMediaProcessed: (callback: (data: any) => void) => void;
         };
     }
 }
 
-
-const root = createRoot(document.getElementById('app'));
-root.render(
-    <React.StrictMode>
-        <App />
-    </React.StrictMode>
+const CustomFallback = () => (
+    <div style={{ textAlign: "center", marginTop: "2rem" }}>
+        <h1>Oops, an error occurred!</h1>
+        <p>Please restart the app or contact support.</p>
+    </div>
 );
+
+const rootElement = document.getElementById('app');
+if (!rootElement) {
+    console.error("Error: Could not find element with id 'app'");
+} else {
+    const root = createRoot(rootElement); root.render(
+        <React.StrictMode>
+            <ErrorBoundary fallbackComponent={<CustomFallback />}>
+                <App />
+            </ErrorBoundary>
+        </React.StrictMode>
+    );
+}

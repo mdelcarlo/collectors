@@ -63,7 +63,6 @@ const createWindow = () => {
   if (process.env.NODE_ENV === 'development') {
     // Dev - use Vite dev server
     mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools();
   } else {
     // Production - use built files
     mainWindow.loadFile(path.join(__dirname, '../../renderer/index.html'));
@@ -73,8 +72,17 @@ const createWindow = () => {
 };
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling
-if (require('electron-squirrel-startup')) {
-  app.quit();
+try {
+  // Only relevant on Windows
+  if (process.platform === 'win32') {
+    const squirrelStartup = require('electron-squirrel-startup');
+    if (squirrelStartup) {
+      app.quit();
+      process.exit(0);
+    }
+  }
+} catch (error) {
+  console.log('Squirrel startup check failed, likely not on Windows:', error.message);
 }
 
 // This method will be called when Electron has finished initialization
@@ -251,83 +259,6 @@ function setupIpcHandlers(mainWindow: BrowserWindow) {
         error: error.message
       });
       return [];
-    }
-  });
-
-  // New handler for processing both thumbnails and audio
-  ipcMain.handle('process-complete', async (_, videoIds) => {
-    try {
-      let pairs = store.get('pairs') as any[];
-      let unpaired = store.get('unpairedVideos') as any[];
-      let allVideos = [
-        ...pairs.flatMap(p => [p.video1, p.video2]),
-      ];
-
-      // Filter to only process requested videos
-      let videosToProcess = allVideos.filter(v => videoIds.includes(v.id));
-
-      // Process thumbnails in background
-      let results = await thumbnailGenerator.generateBatch(videosToProcess);
-
-      // Update thumbnails in store
-      let updatedPairs = pairs.map(pair => ({
-        ...pair,
-        video1: results.find(r => r.id === pair.video1.id) || pair.video1,
-        video2: results.find(r => r.id === pair.video2.id) || pair.video2
-      }));
-
-      let updatedUnpaired = unpaired.map(video =>
-        results.find(r => r.id === video.id) || video
-      );
-
-      store.set('pairs', updatedPairs);
-      store.set('unpairedVideos', updatedUnpaired);
-
-      // Notify renderer
-      mainWindow.webContents.send('thumbnails-generated', results);
-
-      pairs = store.get('pairs') as any[];
-      unpaired = store.get('unpairedVideos') as any[];
-      allVideos = [
-        ...pairs.flatMap(p => [p.video1, p.video2]),
-        ...unpaired
-      ];
-
-      // Filter to only process requested videos
-      videosToProcess = allVideos.filter(v => videoIds.includes(v.id));
-
-      // Process audio in background
-      results = await audioExtractor.extractBatch(videosToProcess);
-      store.set('extractedAudios', results);
-
-      // Update thumbnails in store
-      updatedPairs = pairs.map(pair => ({
-        ...pair,
-        video1: results.find(r => r.id === pair.video1.id) || pair.video1,
-        video2: results.find(r => r.id === pair.video2.id) || pair.video2
-      }));
-
-      updatedUnpaired = unpaired.map(video =>
-        results.find(r => r.id === video.id) || video
-      );
-
-      store.set('pairs', updatedPairs);
-      store.set('unpairedVideos', updatedUnpaired);
-
-      // Notify renderer
-      mainWindow.webContents.send('audio-extracted', results);
-      mainWindow.webContents.send('videos-updated', {
-        pairs: store.get('pairs'),
-        unpairedVideos: store.get('unpairedVideos')
-      });
-      return results;
-    } catch (error) {
-      console.error('Error processing media:', error);
-      mainWindow.webContents.send('processing-error', {
-        type: 'complete',
-        error: error.message
-      });
-      return []
     }
   });
 

@@ -36,9 +36,9 @@ export class MetaGenerator {
         const util = require('util');
         const execAsync = util.promisify(exec);
         
-        async function getVideoFps(video, pythonScriptsDir) {
+        async function getVideoInfo(video, pythonScriptsDir) {
           try {
-            const pythonScript = path.join(pythonScriptsDir, 'extract_fps.py');
+            const pythonScript = path.join(pythonScriptsDir, 'extract_video_info.py');
             const command = \`python "\${pythonScript}" -i "\${video.path}"\`;
             
             const { stdout, stderr } = await execAsync(command);
@@ -54,9 +54,9 @@ export class MetaGenerator {
               throw new Error(result.error);
             }
             
-            return result.fps;
+            return result;
           } catch (error) {
-            console.error('Error getting video FPS:', error);
+            console.error('Error getting video info:', error);
             throw error;
           }
         }
@@ -67,10 +67,16 @@ export class MetaGenerator {
           
           for (const video of videos) {
             try {
-              const fps = await getVideoFps(video, pythonScriptsDir);
+              const videoInfo = await getVideoInfo(video, pythonScriptsDir);
               const processedVideo = {
                 ...video,
-                fps
+                fps: videoInfo.fps,
+                duration: videoInfo.duration,
+                frameCount: videoInfo.frame_count,
+                width: videoInfo.width,
+                height: videoInfo.height,
+                checksum: videoInfo.checksum,
+                processingTime: 0
               };
               results.push(processedVideo);
               

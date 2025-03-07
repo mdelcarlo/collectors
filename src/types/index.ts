@@ -5,17 +5,22 @@ export interface Video {
   path: string;
   name: string;
   createdAt: string | Date;
-  thumbnail?: string | null;
-  thumbnails?: string[]; // Array of paths to thumbnails (one per second)
-  audio?: string; // Path to extracted audio
+  thumbnails?: string[];
+  audio?: string;
   paired?: boolean;
   pairId?: string | null;
   size: number;
   fps?: number;
+  duration?: number;
+  frameCount?: number;
+  width?: number;
+  height?: number;
+  checksum?: string;  
   processingTime?: number;
   processed?: boolean;
   status: VideoStatus;
-  error?: string; // To store error messages if status is 'error'
+  error?: string;
+  preview?: string
 }
 
 export interface Pair {
