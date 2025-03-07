@@ -6,14 +6,13 @@ on:
       - main
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
+  build-mac:
+    runs-on: macos-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Ensure we get full history for Changesets
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -24,27 +23,70 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Apply Changesets Versioning
-        id: changeset
-        run: |
-          npx changeset version
-          echo "VERSION=$(node -p 'require(\"./package.json\").version')" >> $GITHUB_ENV
+      - name: Make Electron App (Mac)
+        run: npm run make -- --platform=darwin
 
-      - name: Commit Version Bump
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json
-          git commit -m "chore: bump version to v${{ env.VERSION }}" || echo "No changes to commit"
-          git push origin main || echo "No changes to push"
-
-      - name: Make Electron App
-        run: npm run make
-
-      - name: Upload Artifacts
+      - name: Upload Mac Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: robotics-contributors
+          name: robotics-contributors-mac
+          path: out/make/
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Make Electron App (Windows)
+        run: npm run make -- --platform=win32
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: robotics-contributors-windows
+          path: out/make/
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Install Required Dependencies for Linux
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libnss3 libasound2
+
+      - name: Make Electron App (Linux)
+        run: npm run make -- --platform=linux
+
+      - name: Upload Linux Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: robotics-contributors-linux
           path: out/make/
 
       # - name: Create GitHub Release
