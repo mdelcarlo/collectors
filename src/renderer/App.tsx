@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import VideoList from './components/VideoList';
 import DragDropArea from './components/DragDropArea';
 import { Select } from './components/Select';
+import ProcessList from './components/ProcessList';
 
 import {
   MdCloudUpload,
@@ -49,7 +50,7 @@ const App: React.FC = () => {
   const [unpairedVideos, setUnpairedVideos] = useState<Video[]>([]);
   const [processingVideos, setProcessingVideos] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<TabType>('paired');
+  const [activeTab, setActiveTab] = useState<TabType>('unpaired');
   const [sortBy, setSortBy] = useState<SortOption>('date');
   const [groupBy, setGroupBy] = useState<GroupOption>('none');
   const [showActions, setShowActions] = useState(false);
@@ -143,6 +144,16 @@ const App: React.FC = () => {
     return () => {
       window.electronAPI.removeAllListeners('videos-updated');
     };
+  }, []);
+
+  const handleRefreshProcesses = useEffect(() => {
+    const loadData = async () => {
+      const data = await window.electronAPI.getAllVideos();
+      setPairs(data.pairs || []);
+      setUnpairedVideos(data.unpairedVideos || []);
+    };
+    
+    loadData();
   }, []);
 
   const getTabClassName = (tabName: TabType) => {
@@ -268,16 +279,16 @@ const App: React.FC = () => {
           <main className="flex-1 p-4">
             <nav className="flex gap-4 mb-4 border-b pb-2">
               <button
-                onClick={() => setActiveTab('paired')}
-                className={getTabClassName('paired')}
-              >
-                Paired Videos <Badge>{pairedVideos.length * 2} ({pairedVideos.length})</Badge>
-              </button>
-              <button
                 onClick={() => setActiveTab('unpaired')}
                 className={getTabClassName('unpaired')}
               >
                 Unpaired Videos <Badge>{unpairedVideos.length}</Badge>
+              </button>
+              <button
+                onClick={() => setActiveTab('paired')}
+                className={getTabClassName('paired')}
+              >
+                Paired Videos <Badge>{pairedVideos.length * 2} ({pairedVideos.length})</Badge>
               </button>
               <button
                 onClick={() => setActiveTab('processing')}
@@ -465,23 +476,28 @@ const App: React.FC = () => {
           </main>)}
 
         {activeSection === 'tasks' && (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center text-gray-500 dark:text-gray-400">
-              <MdTask size={48} className="mx-auto mb-4" />
-              <h2 className="text-xl font-semibold mb-2">Tasks Coming Soon</h2>
-              <p>This feature is under development</p>
-            </div>
+          <div className="p-6">
+            <h2 className="text-2xl font-bold mb-6">Process Manager</h2>
+            <ProcessList onRefresh={handleRefreshProcesses} />
           </div>
         )}
-
 
         {pairedProcessingVideos.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            animate={{ opacity: 1, y: 0, }}
+            onClick={() => {
+              setActiveSection('videos');
+              setActiveTab('processing');
+            }}
+            whileHover={{ 
+              scale: 1.03, 
+              transition: { duration: 0.2 }
+            }}
             className="fixed bottom-6 right-6 bg-gradient-to-r from-blue-600 to-blue-700 
              text-white p-4 rounded-lg shadow-lg flex items-center gap-2
-             dark:from-blue-700 dark:to-blue-800"
+             dark:from-blue-700 dark:to-blue-800 
+             cursor-pointer"
           >
             <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
             Processing {pairedProcessingVideos.length * 2} video(s)...

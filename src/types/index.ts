@@ -5,8 +5,6 @@ export interface Video {
   path: string;
   name: string;
   createdAt: string | Date;
-  thumbnails?: string[];
-  audio?: string;
   paired?: boolean;
   pairId?: string | null;
   size: number;
@@ -17,7 +15,7 @@ export interface Video {
   height?: number;
   checksum?: string;  
   processingTime?: number;
-  processed?: boolean;
+  startProcessingTime?: number;
   status: VideoStatus;
   error?: string;
   preview?: string

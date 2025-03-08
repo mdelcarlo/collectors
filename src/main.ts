@@ -191,17 +191,25 @@ function setupIpcHandlers(mainWindow: BrowserWindow) {
         })),
         ...unpaired
       ];
+      const startTime = Date.now();
+
+      
 
       let updatedPairs = pairs.map(pair => ({
         ...pair,
         video1: {
           ...pair.video1,
-          status: videoIds.includes(pair.video1.id) ? 'processing' : pair.video1.status
+          ...videoIds.includes(pair.video1.id) ? {
+            status: 'processing',
+            startProcessingTime: startTime,
+          } : {},
         },
         video2: {
           ...pair.video2,
-          status: videoIds.includes(pair.video2.id) ? 'processing' : pair.video2.status
-        }
+          ...videoIds.includes(pair.video2.id) ? {
+            status: 'processing',
+            startProcessingTime: startTime,
+          } : {},        }
       }));
 
       store.set('pairs', updatedPairs);
@@ -234,7 +242,6 @@ function setupIpcHandlers(mainWindow: BrowserWindow) {
 
       // Mark processed videos
       results.forEach(result => {
-        result.processed = true;
         result.status = 'processed';
       });
 
