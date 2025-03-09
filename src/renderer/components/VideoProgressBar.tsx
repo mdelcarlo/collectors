@@ -122,12 +122,6 @@ const VideoProgressBar: React.FC<VideoProgressBarProps> = ({ pair }) => {
   useEffect(() => {
     // When processing state changes
     if (isProcessing) {
-      console.log("Processing detected", {
-        video1Status: pair.video1.status,
-        video2Status: pair.video2.status,
-        startTime: activeVideo?.startProcessingTime || 'using component init time'
-      });
-
       // Clean up any existing timers
       if (progressTimerRef.current) {
         clearInterval(progressTimerRef.current);
