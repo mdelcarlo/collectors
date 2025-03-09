@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import VideoList from './components/VideoList';
 import DragDropArea from './components/DragDropArea';
 import { Select } from './components/Select';
-import ProcessList from './components/ProcessList';
 
 import {
   MdCloudUpload,
@@ -22,7 +21,7 @@ import {
 import { BiBot } from "react-icons/bi";
 
 import { motion } from 'framer-motion';
-import { Pair, Video, Audio } from 'src/types';
+import { Pair, Video } from 'src/types';
 import { Badge } from './components/Badge';
 import { calculateFps } from './utils/calculateFps';
 
@@ -144,16 +143,6 @@ const App: React.FC = () => {
     return () => {
       window.electronAPI.removeAllListeners('videos-updated');
     };
-  }, []);
-
-  const handleRefreshProcesses = useEffect(() => {
-    const loadData = async () => {
-      const data = await window.electronAPI.getAllVideos();
-      setPairs(data.pairs || []);
-      setUnpairedVideos(data.unpairedVideos || []);
-    };
-    
-    loadData();
   }, []);
 
   const getTabClassName = (tabName: TabType) => {
@@ -476,11 +465,15 @@ const App: React.FC = () => {
           </main>)}
 
         {activeSection === 'tasks' && (
-          <div className="p-6">
-            <h2 className="text-2xl font-bold mb-6">Process Manager</h2>
-            <ProcessList onRefresh={handleRefreshProcesses} />
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center text-gray-500 dark:text-gray-400">
+              <MdTask size={48} className="mx-auto mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Tasks Coming Soon</h2>
+              <p>This feature is under development</p>
+            </div>
           </div>
         )}
+
 
         {pairedProcessingVideos.length > 0 && (
           <motion.div
