@@ -72,23 +72,19 @@ const DragDropArea: React.FC<DragDropAreaProps> = ({
   if (videos.length === 0) {
     return (
       <div className="p-8 text-center">
-        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 inline-block shadow-sm border border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-2">No Unpaired Videos</h3>
-          <p className="text-gray-500 dark:text-gray-400">
-            Upload more videos to see them here, or check the Paired Videos tab.
-          </p>
-        </div>
+        <p className="text-gray-500 dark:text-gray-400">
+          No unpaired videos. Upload more videos to see them here, or check the Paired Videos tab.
+        </p>
       </div>
     );
   }
 
   // Render video item for either grid or list view
-  const renderVideoItem = (video: Video, index: number) => {
+  const renderVideoItem = (video: Video) => {
     return (
       <motion.div
         key={video.id}
         className={`
-          ${dropTargetId === video.id ? 'ring-2 ring-blue-500 dark:ring-blue-400 shadow-lg' : ''}
           ${viewMode === 'list' ? 'w-full' : ''}
           relative
         `}
@@ -99,15 +95,19 @@ const DragDropArea: React.FC<DragDropAreaProps> = ({
         whileHover={{ y: -4 }}
         transition={{ duration: 0.2 }}
       >
-        {draggedVideoId && draggedVideoId !== video.id && (
-          <div className="absolute inset-0 bg-blue-500 bg-opacity-10 z-10 rounded-lg border-2 border-dashed border-blue-500 pointer-events-none"></div>
+        {draggedVideoId && draggedVideoId !== video.id && dropTargetId !== video.id && (
+          <div className="absolute inset-0 bg-opacity-10 z-10 rounded-lg border-2 border-dashed border-gray-400 pointer-events-none"></div>
         )}
-        
+
+        {dropTargetId === video.id && (
+          <div className="absolute inset-0 bg-opacity-10 z-10 rounded-lg border-2 border-dashed border-blue-500 bg-blue-400 pointer-events-none"></div>
+        )}
+
         <div className="relative group">
           <div className="absolute top-2 right-2 bg-gray-800 bg-opacity-40 text-white p-1 rounded-full z-10 opacity-0 group-hover:opacity-100 transition-opacity">
             <MdDragIndicator className="w-5 h-5" />
           </div>
-          
+
           <VideoItem
             video={video}
             isProcessing={processingVideos.includes(video.id)}
@@ -122,7 +122,7 @@ const DragDropArea: React.FC<DragDropAreaProps> = ({
   // Group view rendering logic
   const renderGroupedVideos = () => {
     return Object.entries(groupVideosByDay(videos))
-      .sort(([dateA], [dateB]) => 
+      .sort(([dateA], [dateB]) =>
         new Date(dateB).getTime() - new Date(dateA).getTime()
       )
       .map(([date, dateVideos]) => (
@@ -135,14 +135,14 @@ const DragDropArea: React.FC<DragDropAreaProps> = ({
               {dateVideos.length} video{dateVideos.length !== 1 ? 's' : ''}
             </span>
           </h3>
-          
+
           {viewMode === 'grid' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              {dateVideos.map((video, index) => renderVideoItem(video, index))}
+              {dateVideos.map(renderVideoItem)}
             </div>
           ) : (
             <div className="space-y-3">
-              {dateVideos.map((video, index) => renderVideoItem(video, index))}
+              {dateVideos.map(renderVideoItem)}
             </div>
           )}
         </div>
@@ -153,11 +153,11 @@ const DragDropArea: React.FC<DragDropAreaProps> = ({
   const renderUngroupedVideos = () => {
     return viewMode === 'grid' ? (
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-        {videos.map((video, index) => renderVideoItem(video, index))}
+        {videos.map(renderVideoItem)}
       </div>
     ) : (
       <div className="space-y-3">
-        {videos.map((video, index) => renderVideoItem(video, index))}
+        {videos.map(renderVideoItem)}
       </div>
     );
   };
@@ -166,7 +166,7 @@ const DragDropArea: React.FC<DragDropAreaProps> = ({
     <div>
       <AnimatePresence>
         {showHint && (
-          <motion.div 
+          <motion.div
             className="flex items-center p-4 mb-4 bg-blue-50 dark:bg-blue-900 rounded-lg text-blue-800 dark:text-blue-200 text-sm"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
