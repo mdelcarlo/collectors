@@ -7,8 +7,8 @@
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",
-    "postpackage": "node scripts/bundle-python.js",
     "make": "electron-forge make",
+    "postmake": "node scripts/bundle-python.js",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx ."
   },
@@ -38,6 +38,7 @@
     "electron": "34.2.0",
     "eslint": "^8.57.1",
     "eslint-plugin-import": "^2.31.0",
+    "glob": "^10.3.10",
     "postcss": "^8.5.3",
     "tailwindcss": "npm:@tailwindcss/postcss7-compat@^2.2.17",
     "ts-node": "^10.9.2",
