@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  build-all:
+  build-windows:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -22,24 +22,27 @@ jobs:
           docker build -t robotics-contributors-win -f Dockerfile.windows .
           docker run --rm -v ${{ github.workspace }}/out:/app/out robotics-contributors-win
 
-      - name: Build macOS App
-        run: |
-          docker build -t robotics-contributors-mac -f Dockerfile.macos .
-          docker run --rm -v ${{ github.workspace }}/out:/app/out robotics-contributors-mac
-
-      - name: Build Linux App
-        run: |
-          docker build -t robotics-contributors-linux -f Dockerfile.linux .
-          docker run --rm -v ${{ github.workspace }}/out:/app/out robotics-contributors-linux
-
-      - name: List Output Directory (Debug)
-        run: find out -type f | sort
-
       - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: robotics-contributors-windows
           path: out/make/squirrel.windows/x64/
+
+  build-macos:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build macOS App
+        run: |
+          docker build -t robotics-contributors-mac -f Dockerfile.macos .
+          docker run --rm -v ${{ github.workspace }}/out:/app/out robotics-contributors-mac
 
       - name: Upload macOS Artifacts
         uses: actions/upload-artifact@v4
@@ -47,11 +50,39 @@ jobs:
           name: robotics-contributors-mac
           path: out/make/zip/darwin/x64/
 
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Linux App
+        run: |
+          docker build -t robotics-contributors-linux -f Dockerfile.linux .
+          docker run --rm -v ${{ github.workspace }}/out:/app/out robotics-contributors-linux
+
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: robotics-contributors-linux
           path: out/make/deb/x64/
+
+  release:
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: out
+
+      - name: List Output Directory (Debug)
+        run: find out -type f | sort
 
       # - name: Create GitHub Release
       #   uses: softprops/action-gh-release@v2
@@ -61,6 +92,6 @@ jobs:
       #     body: "Automated release of robotics-contributors v${{ env.VERSION }}"
       #     draft: false
       #     prerelease: false
-      #     files: out/make/**
+      #     files: out/**
       #   env:
       #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
