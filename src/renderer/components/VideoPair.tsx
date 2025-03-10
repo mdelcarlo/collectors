@@ -49,6 +49,7 @@ const VideoPair: React.FC<VideoPairProps> = ({
 
   const isProcessedPair = pair.video1.status === 'processed' && pair.video2.status === 'processed';
   const isProcessing = pair.video1.status === 'processing' || pair.video2.status === 'processing';
+  const isActiveProcessing = isProcessing && (pair.video1.startProcessingTime || pair.video2.startProcessingTime);
   if (viewMode === 'grid') {
     return (
       <>
@@ -88,6 +89,7 @@ const VideoPair: React.FC<VideoPairProps> = ({
                   <VideoItem
                     video={pair.video1}
                     isProcessing={isProcessing}
+                    isActiveProcessing={isActiveProcessing}
                   />
                 </div>
               </div>
@@ -99,6 +101,7 @@ const VideoPair: React.FC<VideoPairProps> = ({
                   <VideoItem
                     video={pair.video2}
                     isProcessing={isProcessing}
+                    isActiveProcessing={isActiveProcessing}
                   />
                 </div>
               </div>

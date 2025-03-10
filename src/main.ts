@@ -28,41 +28,60 @@ const store = new Store({
   }
 });
 
-// function clearStore() {
-//   store.clear();
-//   store.set({
-//     pairs: [],
-//     unpairedVideos: [],
-//   });
-// }
+function clearStore() {
+  store.clear();
+  store.set({
+    pairs: [],
+    unpairedVideos: [],
+  });
+}
 
-// clearStore()
+clearStore()
+
+const updateVideoState = (mainWindow: BrowserWindow) => (video) => {
+  console.log('Updating video state:', video);
+  const pairs = store.get('pairs') as any[];
+
+  const updatedPairs = pairs.map(pair => ({
+    ...pair,
+    video1: pair.video1.id === video.id ? video : pair.video1,
+    video2: pair.video2.id === video.id ? video : pair.video2
+  }));
+  console.log('updatedPairs: ', updatedPairs);
+
+  store.set('pairs', updatedPairs);
+
+  mainWindow.webContents.send('videos-updated', {
+    pairs: updatedPairs,
+    unpairedVideos: store.get('unpairedVideos')
+  });
+}
 
 const loadProcessingVideos = async (mainWindow: BrowserWindow) => {
   try {
     console.log('Loading status of processing videos...');
     const existingPairs = store.get('pairs') as any[];
 
-    const videosToProcess = existingPairs.flatMap(p => [p.video1, p.video2]).filter(video => video.status === 'processing');
+    const videosToProcess = existingPairs.flatMap(p => [{ ...p.video1, pairId: p.id }, { ...p.video2, pairId: p.id }]).filter(video => video.status === 'processing');
     console.log('videosToProcess: ', videosToProcess);
 
     const videoIds = videosToProcess.map(v => v.id);
 
-    const startTime = Date.now();
+    // const startTime = Date.now();
     let updatedPairs = existingPairs.map(pair => ({
       ...pair,
       video1: {
         ...pair.video1,
         ...videoIds.includes(pair.video1.id) ? {
           status: 'processing',
-          startProcessingTime: startTime,
+          startProcessingTime: undefined,
         } : {},
       },
       video2: {
         ...pair.video2,
         ...videoIds.includes(pair.video2.id) ? {
           status: 'processing',
-          startProcessingTime: startTime,
+          startProcessingTime: undefined,
         } : {},
       }
     }));
@@ -75,21 +94,38 @@ const loadProcessingVideos = async (mainWindow: BrowserWindow) => {
       unpairedVideos: store.get('unpairedVideos')
     });
 
-    
+    const updateVideoCallback = updateVideoState(mainWindow)
     // Process videos with the new MediaProcessor
-    const results = await mediaProcessor.processBatch(videosToProcess);
-
-    // Update videos in store
-    updatedPairs = existingPairs.map(pair => ({
-      ...pair,
-      video1: results.find(r => r.id === pair.video1.id) || pair.video1,
-      video2: results.find(r => r.id === pair.video2.id) || pair.video2
-    }));
-
-    // Mark processed videos
-    results.forEach(result => {
-      result.status = 'processed';
-    });
+    const videosToProcessGroupedByPair = videosToProcess.reduce((acc, video) => {
+      if (!acc[video.pairId]) {
+        acc[video.pairId] = [];
+      }
+      acc[video.pairId].push(video);
+      return acc;
+    }, {});
+    for (const videos of Object.values(videosToProcessGroupedByPair)) {
+      const results = await mediaProcessor.processBatch(videos, updateVideoCallback);
+    
+      // Mark processed videos
+      results.forEach(result => {
+        result.status = 'processed';
+      });
+    
+      updatedPairs = store.get('pairs').map(pair => ({
+        ...pair,
+        video1: results.find(r => r.id === pair.video1.id) || pair.video1,
+        video2: results.find(r => r.id === pair.video2.id) || pair.video2
+      }));
+    
+      store.set('pairs', updatedPairs);
+    
+      // Notify renderer about the updates
+      mainWindow.webContents.send('media-processed', results);
+      mainWindow.webContents.send('videos-updated', {
+        pairs: store.get('pairs'),
+        unpairedVideos: store.get('unpairedVideos')
+      });
+    }
 
     store.set('pairs', updatedPairs);
 
@@ -124,9 +160,6 @@ const createWindow = () => {
       webSecurity: false, // Disable web security to allow local resource loading
     },
   });
-
-  loadProcessingVideos(mainWindow);
-
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
   } else {
@@ -156,6 +189,8 @@ app.whenReady().then(() => {
 
   // Set up IPC handlers
   setupIpcHandlers(mainWindow);
+
+  loadProcessingVideos(mainWindow);
 
   app.on('activate', () => {
     // On macOS it's common to re-create a window in the app when the
@@ -252,28 +287,27 @@ function setupIpcHandlers(mainWindow: BrowserWindow) {
       const pairs = store.get('pairs') as any[];
       const unpaired = store.get('unpairedVideos') as any[];
       const allVideos = [
-        ...pairs.flatMap(p => [p.video1, p.video2]).map(video => ({
+        ...pairs.flatMap(p => [{...p.video1, pairId: p.id}, {...p.video2, pairId: p.id}]).map(video => ({
           ...video,
           status: videoIds.includes(video.id) ? 'processing' : video.status
         })),
         ...unpaired
       ];
 
-      const startTime = Date.now();
       let updatedPairs = pairs.map(pair => ({
         ...pair,
         video1: {
           ...pair.video1,
           ...videoIds.includes(pair.video1.id) ? {
             status: 'processing',
-            startProcessingTime: startTime,
+            // startProcessingTime: startTime,
           } : {},
         },
         video2: {
           ...pair.video2,
           ...videoIds.includes(pair.video2.id) ? {
             status: 'processing',
-            startProcessingTime: startTime,
+            // startProcessingTime: startTime,
           } : {},
         }
       }));
@@ -291,36 +325,40 @@ function setupIpcHandlers(mainWindow: BrowserWindow) {
       // Filter to only process requested videos
       const videosToProcess = allVideos.filter(v => videoIds.includes(v.id));
 
+      const updateVideoCallback = updateVideoState(mainWindow)
       // Process videos with the new MediaProcessor
-      const results = await mediaProcessor.processBatch(videosToProcess);
-
-      // Update videos in store
-      updatedPairs = pairs.map(pair => ({
-        ...pair,
-        video1: results.find(r => r.id === pair.video1.id) || pair.video1,
-        video2: results.find(r => r.id === pair.video2.id) || pair.video2
-      }));
-
-      const updatedUnpaired = unpaired.map(video =>
-        results.find(r => r.id === video.id) || video
-      );
-
-      // Mark processed videos
-      results.forEach(result => {
-        result.status = 'processed';
-      });
-
-      store.set('pairs', updatedPairs);
-      store.set('unpairedVideos', updatedUnpaired);
-
-      // Notify renderer about the updates
-      mainWindow.webContents.send('media-processed', results);
-      mainWindow.webContents.send('videos-updated', {
-        pairs: store.get('pairs'),
-        unpairedVideos: store.get('unpairedVideos')
-      });
-
-      return results;
+      const videosToProcessGroupedByPair = videosToProcess.reduce((acc, video) => {
+        if (!acc[video.pairId]) {
+          acc[video.pairId] = [];
+        }
+        acc[video.pairId].push(video);
+        return acc;
+      }, {});
+      console.log('videosToProcessGroupedByPair: ', videosToProcessGroupedByPair);
+      for (const videos of Object.values(videosToProcessGroupedByPair)) {
+        const results = await mediaProcessor.processBatch(videos, updateVideoCallback);
+        console.log('--------results: ', results);
+      
+        // Mark processed videos
+        results.forEach(result => {
+          result.status = 'processed';
+        });
+      
+        updatedPairs = store.get('pairs').map(pair => ({
+          ...pair,
+          video1: results.find(r => r.id === pair.video1.id) || pair.video1,
+          video2: results.find(r => r.id === pair.video2.id) || pair.video2
+        }));
+      
+        store.set('pairs', updatedPairs);
+      
+        // Notify renderer about the updates
+        mainWindow.webContents.send('media-processed', results);
+        mainWindow.webContents.send('videos-updated', {
+          pairs: store.get('pairs'),
+          unpairedVideos: store.get('unpairedVideos')
+        });
+      }
     } catch (error) {
       console.error('Error processing media:', error);
       mainWindow.webContents.send('processing-error', {

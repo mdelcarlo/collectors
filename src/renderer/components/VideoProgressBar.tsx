@@ -32,10 +32,11 @@ const VideoProgressBar: React.FC<VideoProgressBarProps> = ({ pair }) => {
   const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const initTimeRef = useRef<number>(Date.now());
 
-  const video1Processing = pair.video1.status === 'processing';
-  const video2Processing = pair.video2.status === 'processing';
+  const video1Processing = pair.video1.status === 'processing' && pair.video1.startProcessingTime;
+  const video2Processing = pair.video2.status === 'processing' && pair.video2.startProcessingTime;
   const isProcessing = video1Processing || video2Processing;
 
+  // Check if either video is queued (has status 'processing' but no startProcessingTime)
   const activeVideo = video1Processing ? pair.video1 : video2Processing ? pair.video2 : null;
 
   /**
@@ -170,6 +171,18 @@ const VideoProgressBar: React.FC<VideoProgressBarProps> = ({ pair }) => {
       }
     };
   }, []);
+
+  // Show queue message when video is marked for processing but not actively processing yet
+  if (!activeVideo) {
+    return (
+      <div className="w-full my-2">
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded-full bg-yellow-400 dark:bg-yellow-500 animate-pulse"></div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Waiting in processing queue...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Only show if processing or forcibly shown
   if (!isProcessing && !forceShow) return null;

@@ -15,7 +15,8 @@ import { calculateFps } from '../utils/calculateFps';
 
 interface VideoItemProps {
   video: Video;
-  isProcessing: boolean;
+  isProcessing?: boolean;
+  isActiveProcessing?: boolean;
   isDraggable?: boolean;
   onDragStart?: (event: React.DragEvent, videoId: string) => void;
 }
@@ -111,6 +112,7 @@ const VideoModal = ({
 const VideoItem: React.FC<VideoItemProps> = ({
   video,
   isProcessing,
+  isActiveProcessing,
   isDraggable = false,
   onDragStart
 }) => {
@@ -134,7 +136,7 @@ const VideoItem: React.FC<VideoItemProps> = ({
           border border-gray-200 dark:border-gray-600 
           shadow-sm hover:shadow-md transition-shadow duration-200
           ${isDraggable ? 'cursor-grab' : ''}
-          ${isProcessing ? 'opacity-50' : ''}
+          ${isProcessing && !isActiveProcessing ? 'opacity-50' : ''}
           overflow-hidden
         `}
         draggable={isDraggable && !isVideoPlaying}
@@ -185,7 +187,7 @@ const VideoItem: React.FC<VideoItemProps> = ({
               </div>
             )}
 
-            {isProcessing && (
+            {isActiveProcessing && (
               <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
                 <div className="loader"></div>
               </div>
