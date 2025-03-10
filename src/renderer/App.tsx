@@ -206,7 +206,7 @@ const App: React.FC = () => {
   const pairedProcessingVideos = sortPairs(filterPairs(getProcessingPairs()));
   const pairedProcessedVideos = sortPairs(filterPairs(getProcessedPairs()));
 
-  const activePair = pairedProcessedVideos[0]
+  const activePair = pairedProcessingVideos[0]
 
   return (
     <div className="flex w-full bg-gray-50 dark:bg-gray-900 min-h-screen">
