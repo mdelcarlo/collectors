@@ -7,7 +7,6 @@ import { Select } from './components/Select';
 import ProcessingIndicator from './components/ProcessingIndicator';
 
 import {
-  MdCloudUpload,
   MdLink,
   MdMoreVert,
   MdVideoCameraFront,
@@ -18,7 +17,6 @@ import {
   MdTask,
   MdGridView,
   MdViewList,
-  MdAutorenew
 } from 'react-icons/md';
 import { BiBot } from "react-icons/bi";
 
@@ -26,6 +24,7 @@ import { motion } from 'framer-motion';
 import { Pair, Video } from 'src/types';
 import { Badge } from './components/Badge';
 import { calculateFps } from './utils/calculateFps';
+import Header from './components/Header';
 
 type TabType = 'paired' | 'unpaired' | 'processing' | 'processed';
 export type SortOption = 'date' | 'size' | 'name' | 'fps'
@@ -58,7 +57,6 @@ const App: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [activeSection, setActiveSection] = useState<MenuSection>('videos');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [showLoadingPanel, setShowLoadingPanel] = useState(false);
 
   const filterVideos = (videos: Video[]) => {
     if (!searchTerm) return videos;
@@ -253,20 +251,11 @@ const App: React.FC = () => {
       {/* Main content area */}
       <div className="ml-64 flex-1 flex flex-col">
         {/* Header */}
-        <header className="sticky top-0 z-10 bg-white dark:bg-gray-800 p-3 border-b dark:border-gray-700 flex justify-between items-center max-h-14">
-          <div className="text-md font-semibold text-gray-800 dark:text-white text-center flex-1">
-            {activeSection === 'videos' ? 'Videos' : 'Tasks'}
-          </div>
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={handleUpload}
-            disabled={isLoading}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold p-3 rounded-lg shadow-md"
-          >
-            <MdCloudUpload />
-          </motion.button>
-        </header>
+        <Header
+          activeSection={activeSection}
+          isLoading={isLoading}
+          onUpload={handleUpload}
+        />
 
         {/* Main content */}
         {activeSection === 'videos' && (
