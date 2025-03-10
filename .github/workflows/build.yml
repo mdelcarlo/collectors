@@ -63,7 +63,7 @@ jobs:
         run: npm run make -- --platform=win32
 
       - name: List Output Directory (Debug)
-        run: dir "out\make\" /s
+        run: dir "out/make/" /s
 
       - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
