@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { Pair } from 'src/types';
 
 interface VideoProgressBarProps {
@@ -6,8 +6,8 @@ interface VideoProgressBarProps {
 }
 
 // Progress calculation constants
-const START_EXPONENTIAL_SLOWDOWN = 80;   // Percentage where exponential slowdown begins
-const END_EXPONENTIAL_SLOWDOWN = 99;     // Maximum percentage during processing
+const START_EXPONENTIAL_SLOWDOWN = 75;   // Percentage where exponential slowdown begins
+const END_EXPONENTIAL_SLOWDOWN = 97;     // Maximum percentage during processing
 const BASE_PROCESSING_TIME = 420000;     // 7 minutes base time
 const MAX_PROCESSING_TIME = 600000;      // 10 minutes maximum (cap)
 const DEFAULT_FPS = 30;                  // Default frames per second if not available
@@ -24,6 +24,69 @@ const SECONDS_IN_MINUTE = 60;
 const PROGRESS_UPDATE_INTERVAL = 1000;   // Update progress every 1 second
 const COMPLETION_DISPLAY_DURATION = 2000; // Show 100% for 2 seconds
 
+// Light beam styles - defined outside component to prevent recreation on each render
+const lightBeamStyles = {
+  width: "15px",
+  transform: "skewX(-15deg)",
+  background: "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%)",
+  animation: "lightBeam 1.2s linear infinite"
+};
+
+// Animation style - defined once outside component
+const animationStyle = `
+  @keyframes lightBeam {
+    0% {
+      left: -20px;
+    }
+    100% {
+      left: 100%;
+    }
+  }
+`;
+
+// Extracted Progress UI for memoization
+const ProgressUI = memo(({ percentage, timeRemaining, isProcessing }: { 
+  percentage: number, 
+  timeRemaining: string, 
+  isProcessing: boolean 
+}) => (
+  <div className="w-full my-2">
+    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
+      <div
+        className={`h-2.5 rounded-full relative ${isProcessing ? 'bg-blue-500 dark:bg-blue-600' : 'bg-green-500 dark:bg-green-600'}`}
+        style={{
+          width: `${percentage}%`,
+          transition: 'width 0.8s ease-in-out'
+        }}
+      >
+        {/* Light beam effect */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div 
+            className="absolute h-full"
+            style={lightBeamStyles}
+          />
+        </div>
+      </div>
+    </div>
+
+    {/* Add CSS keyframes for the light beam animation */}
+    <style jsx>{animationStyle}</style>
+  </div>
+));
+
+ProgressUI.displayName = 'ProgressUI';
+
+// Queue message component
+const QueueMessage = memo(() => (
+  <div className="w-full my-2">
+    <div className="flex items-center gap-2">
+      <div className="w-4 h-4 rounded-full bg-yellow-400 dark:bg-yellow-500 animate-pulse"></div>
+      <p className="text-sm text-gray-600 dark:text-gray-400">Waiting in processing queue...</p>
+    </div>
+  </div>
+));
+
+QueueMessage.displayName = 'QueueMessage';
 
 const VideoProgressBar: React.FC<VideoProgressBarProps> = ({ pair }) => {
   const [progress, setProgress] = useState({ percentage: 0, timeRemaining: '' });
@@ -31,7 +94,7 @@ const VideoProgressBar: React.FC<VideoProgressBarProps> = ({ pair }) => {
   const estimatedTotalTimeRef = useRef<number>(0);
   const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const initTimeRef = useRef<number>(Date.now());
-
+  
   const video1Processing = pair.video1.status === 'processing' && pair.video1.startProcessingTime;
   const video2Processing = pair.video2.status === 'processing' && pair.video2.startProcessingTime;
   const isProcessing = video1Processing || video2Processing;
@@ -41,17 +104,9 @@ const VideoProgressBar: React.FC<VideoProgressBarProps> = ({ pair }) => {
 
   /**
    * Calculates the estimated processing time for the video pair based on their properties.
-   * The calculation considers multiple factors:
-   * - Total size of both videos
-   * - Average duration
-   * - Average frames per second
-   * 
-   * The base processing time is adjusted by these factors, with each factor having
-   * minimum and maximum multipliers to avoid extreme values.
-   * 
-   * @returns {number} Estimated total processing time in milliseconds, capped at 10 minutes
+   * Memoized to prevent recalculation on every render.
    */
-  const calculateEstimatedTime = () => {
+  const calculateEstimatedTime = useCallback(() => {
     const video1 = pair.video1;
     const video2 = pair.video2;
 
@@ -64,17 +119,12 @@ const VideoProgressBar: React.FC<VideoProgressBarProps> = ({ pair }) => {
     const fpsFactor = Math.max(MIN_FPS_FACTOR, Math.min(MAX_FPS_FACTOR, avgFps / DEFAULT_FPS));
 
     return Math.min(MAX_PROCESSING_TIME, BASE_PROCESSING_TIME * sizeFactor * durationFactor * fpsFactor);
-  };
+  }, [pair.video1, pair.video2]);
 
   /**
-   * Applies an exponential slowdown effect to the progress percentage as it approaches completion.
-   * This creates a more realistic progress display that slows down near the end, matching typical
-   * processing patterns where final steps take longer.
-   * 
-   * @param linearPercentage - The raw linear percentage of completion (0-100)
-   * @returns An adjusted percentage value with exponential slowdown applied
+   * Applies an exponential slowdown effect to the progress percentage.
    */
-  const applyExponentialSlowdown = (linearPercentage: number): number => {
+  const applyExponentialSlowdown = useCallback((linearPercentage: number): number => {
     if (linearPercentage < START_EXPONENTIAL_SLOWDOWN) {
       return linearPercentage;
     }
@@ -83,13 +133,12 @@ const VideoProgressBar: React.FC<VideoProgressBarProps> = ({ pair }) => {
     const normalizedProgress = (linearPercentage - START_EXPONENTIAL_SLOWDOWN) / remainingRange; // 0 to 1
 
     // Exponential curve: slower progress as we approach 1
-    // Power of 3 gives a good exponential curve
     const slowedProgress = Math.pow(normalizedProgress, 3);
 
     return START_EXPONENTIAL_SLOWDOWN + (slowedProgress * remainingRange);
-  };
+  }, []);
 
-  const updateProgress = () => {
+  const updateProgress = useCallback(() => {
     if (!isProcessing) return;
 
     const startTime = activeVideo?.startProcessingTime || initTimeRef.current;
@@ -117,7 +166,7 @@ const VideoProgressBar: React.FC<VideoProgressBarProps> = ({ pair }) => {
       percentage: adjustedPercentage,
       timeRemaining: timeText
     });
-  };
+  }, [isProcessing, activeVideo, applyExponentialSlowdown]);
 
   // Effect to handle processing state changes
   useEffect(() => {
@@ -140,8 +189,6 @@ const VideoProgressBar: React.FC<VideoProgressBarProps> = ({ pair }) => {
     }
     // When processing completes
     else if (forceShow) {
-      console.log("Processing completed");
-
       // Show 100% completion
       setProgress({ percentage: 100, timeRemaining: '' });
 
@@ -161,7 +208,7 @@ const VideoProgressBar: React.FC<VideoProgressBarProps> = ({ pair }) => {
         progressTimerRef.current = null;
       }
     };
-  }, [isProcessing, pair.video1.status, pair.video2.status]);
+  }, [isProcessing, calculateEstimatedTime, updateProgress]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -174,33 +221,19 @@ const VideoProgressBar: React.FC<VideoProgressBarProps> = ({ pair }) => {
 
   // Show queue message when video is marked for processing but not actively processing yet
   if (!activeVideo) {
-    return (
-      <div className="w-full my-2">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-yellow-400 dark:bg-yellow-500 animate-pulse"></div>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Waiting in processing queue...</p>
-        </div>
-      </div>
-    );
+    return <QueueMessage />;
   }
 
   // Only show if processing or forcibly shown
   if (!isProcessing && !forceShow) return null;
 
   return (
-    <div className="w-full my-2">
-      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
-        <div
-          className={`h-2.5 rounded-full ${isProcessing ? 'bg-blue-500 dark:bg-blue-600' : 'bg-green-500 dark:bg-green-600'
-            }`}
-          style={{
-            width: `${progress.percentage}%`,
-            transition: 'width 0.8s ease-in-out'
-          }}
-        />
-      </div>
-    </div>
+    <ProgressUI 
+      percentage={progress.percentage} 
+      timeRemaining={progress.timeRemaining} 
+      isProcessing={isProcessing}
+    />
   );
 };
 
-export default VideoProgressBar;
+export default memo(VideoProgressBar);
