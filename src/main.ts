@@ -33,7 +33,7 @@ class StoreManager {
         unpairedVideos: [],
       }
     });
-    // this.clear(); // Clear store on startup
+    this.clear(); // Clear store on startup
   }
 
   clear() {
