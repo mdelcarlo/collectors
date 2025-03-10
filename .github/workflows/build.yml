@@ -78,7 +78,7 @@ jobs:
       - name: Install Required Dependencies for Linux
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libnss3 libasound2
+          sudo apt-get install -y libgtk-3-dev libnss3 libasound2t64
 
       - name: Make Electron App (Linux)
         run: npm run make -- --platform=linux
