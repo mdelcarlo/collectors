@@ -100,7 +100,7 @@ export class MediaProcessor {
               console.error('Error processing video:', error);
               parentPort.postMessage({ 
                 type: 'error', 
-                videoId: video.id, 
+                video, 
                 error: error.message 
               });
             }
@@ -124,6 +124,11 @@ export class MediaProcessor {
 
       worker.on('message', (message) => {
         if (message.type === 'init') {
+          updateVideo(message.video)
+        } else if (message.type === 'error') {
+          message.video.error = 'Error while processing video';
+          message.video.status = 'idle';
+          message.video.startProcessingTime = undefined;
           updateVideo(message.video)
         } else if (message.type === 'progress') {
           results.push(message.video);

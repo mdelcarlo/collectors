@@ -109,7 +109,7 @@ class DataManager {
   }
 
   // Process videos
-  async processVideos(videoIds: string[], isResuming = false) {
+  async processVideos(videoIds: string[]) {
     try {
       const pairs = this.storeManager.getPairs();
       const unpaired = this.storeManager.getUnpairedVideos();
