@@ -6,69 +6,7 @@ on:
       - main
 
 jobs:
-  build-mac:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-          cache: 'npm'
-
-      - name: Install Dependencies
-        run: npm install
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Make Electron App (Mac)
-        run: npm run make -- --platform=darwin
-
-      - name: Upload Mac Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: robotics-contributors-mac
-          path: out/make/
-
-  build-windows:
-    runs-on: windows-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-          cache: 'npm'
-
-      - name: Install Dependencies
-        run: npm install
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Make Electron App (Windows)
-        run: npm run make -- --platform=win32
-
-      - name: Upload Windows Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: robotics-contributors-windows
-          path: out/make/
-
-  build-linux:
+  build-all:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -76,36 +14,44 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-          cache: 'npm'
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Install Dependencies
-        run: npm install
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Install Required Dependencies for Linux
+      - name: Build Windows App
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libnss3 libasound2t64 libxss1 libgbm1 libxshmfence1 libegl1
+          docker build -t robotics-contributors-win -f Dockerfile.windows .
+          docker run --rm -v ${{ github.workspace }}/out:/app/out robotics-contributors-win
 
-      - name: Make Electron App (Linux)
-        run: npm run make -- --platform=linux
+      - name: Build macOS App
+        run: |
+          docker build -t robotics-contributors-mac -f Dockerfile.macos .
+          docker run --rm -v ${{ github.workspace }}/out:/app/out robotics-contributors-mac
+
+      - name: Build Linux App
+        run: |
+          docker build -t robotics-contributors-linux -f Dockerfile.linux .
+          docker run --rm -v ${{ github.workspace }}/out:/app/out robotics-contributors-linux
 
       - name: List Output Directory (Debug)
-        run: find out/make -type f | sort
+        run: find out -type f | sort
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: robotics-contributors-windows
+          path: out/make/squirrel.windows/x64/
+
+      - name: Upload macOS Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: robotics-contributors-mac
+          path: out/make/zip/darwin/x64/
 
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: robotics-contributors-linux
-          path: out/make/
+          path: out/make/deb/x64/
 
       # - name: Create GitHub Release
       #   uses: softprops/action-gh-release@v2
