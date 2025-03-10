@@ -10,8 +10,9 @@ import json
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 from moviepy.audio.io.AudioFileClip import AudioFileClip
 import glob
-import numpy as np
+from typing import TypedDict
 
+# Args #
 parser = argparse.ArgumentParser(description="Video creation from thumbnails and audio.")
 parser.add_argument(
     "-t",
@@ -42,30 +43,40 @@ parser.add_argument(
     help="Video codec (default: libx264)",
     required=False,
 )
+parser.add_argument(
+    "-m",
+    "--metadata",
+    type=json.loads,
+    default=None,
+    help="Metadata to add to the video file (JSON string)",
+    required=False,
+)
 
-def create_video(thumbnails_input, audio_path, output_path, codec="libx264"):
+# Types #
+class CreateVideoResults(TypedDict):
+    elapsed_time: float
+    output_path: str
+
+# Functions #
+def create_video_from_thumbs(thumbnails_input, audio_path, output_path, codec="libx264",
+                 filename="sample_video.mp4", metadata=None) -> CreateVideoResults:
     """Create a video from thumbnails and audio."""
+
     print(f"Starting video creation with thumbnails and audio: {audio_path}")
     start_time = time.time()
-    print(thumbnails_input, audio_path, output_path, codec)
     
     # Make sure output directory exists
     os.makedirs(output_path, exist_ok=True)
-    filepath = os.path.join(output_path, 'sample_video.mp4')
     try:
-        print(output_path)
         # Get thumbnail files
         if os.path.isfile(thumbnails_input) and thumbnails_input.lower().endswith('.json'):
-            print(1)
             # Load thumbnail paths from JSON file
             with open(thumbnails_input, 'r') as f:
                 thumbnail_files = json.load(f)
         elif os.path.isdir(thumbnails_input):
-            print(2)
             # Find all thumbnail files in directory
             thumbnail_files = sorted(glob.glob(os.path.join(thumbnails_input, '*.png')))
         else:
-            print(3)
             # Assume it's a string containing JSON
             thumbnail_files = json.loads(thumbnails_input)
 
@@ -80,16 +91,15 @@ def create_video(thumbnails_input, audio_path, output_path, codec="libx264"):
         
         # Calculate how long each frame should be displayed
         # This ensures frames are distributed evenly across the entire audio duration
-        num_frames = len(thumbnail_files)
+        thumbs_amount = len(thumbnail_files)
+        fps = thumbs_amount / audio_duration
         
-        # Create an array of frame durations that will sum to audio_duration
-        frame_durations = np.full(num_frames, audio_duration / num_frames)
-        
-        print(f"Audio duration: {audio_duration:.2f}s, Each frame will display for {frame_durations[0]:.2f}s")
+        print(f"Audio duration: {audio_duration:.2f}s, Using FPS: {fps:.2f}")
+
         
         # Create video clip from image sequence with specified durations for each frame
         print('Creating image sequence clip..')
-        video_clip = ImageSequenceClip(thumbnail_files, durations=frame_durations.tolist())
+        video_clip = ImageSequenceClip(thumbnail_files, fps)
         
         # Add audio to video clip
         video_clip.audio = audio_clip
@@ -98,15 +108,28 @@ def create_video(thumbnails_input, audio_path, output_path, codec="libx264"):
         print(f"Video duration: {video_clip.duration:.2f}s, Audio duration: {audio_duration:.2f}s")
         
         # Write the result to a file
+        filepath = os.path.join(output_path, filename)
         print(f"Writing video to {filepath}...")
+
+        checkpoint = time.time()
+
+        print(f'Time taken so far: {(checkpoint - start_time) * 1000}')
+
+        # add metadata
+        ffmpeg_metadata = []
+        if metadata is not None:
+            for key, value in metadata.items():
+                ffmpeg_metadata.extend(['-metadata', f'{key}={value}'])
+
         video_clip.write_videofile(
             filepath,
             codec=codec,
             audio_codec='aac',
             temp_audiofile='temp-audio.m4a',
-            remove_temp=True
+            remove_temp=True,
+            ffmpeg_params=ffmpeg_metadata if ffmpeg_metadata else None
         )
-        
+
         # Close the clips
         video_clip.close()
         audio_clip.close()
@@ -115,8 +138,7 @@ def create_video(thumbnails_input, audio_path, output_path, codec="libx264"):
         processing_time = (end_time - start_time) * 1000  # Convert to ms
         
         print(f"Video creation completed in {processing_time:.2f}ms")
-        print(filepath)  # Output the path to the created video file
-        return filepath
+        return { "elapsed_time": processing_time, "output_path": filepath}
         
     except Exception as e:
         print(f"Error creating video: {str(e)}", file=sys.stderr)
@@ -129,5 +151,6 @@ if __name__ == "__main__":
     audio_path = args.audio
     output_path = args.output
     codec = args.codec
-
-    create_video(thumbnails_input, audio_path, output_path, codec)
+    metadata = args.metadata
+    
+    create_video_from_thumbs(thumbnails_input, audio_path, output_path, codec)

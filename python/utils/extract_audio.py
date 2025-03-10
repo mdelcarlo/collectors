@@ -2,13 +2,17 @@
 """
 Python script to extract audio from video files using moviepy.
 """
+import contextlib
+import io
 import sys
 import os
 import time
 import json
+from typing import TypedDict
 from moviepy.video.io.VideoFileClip import VideoFileClip
 import argparse
 
+# Args #
 parser = argparse.ArgumentParser(description="Niftier running.")
 parser.add_argument(
     "-i",
@@ -25,7 +29,13 @@ parser.add_argument(
     required=True,
 )
 
-def extract_audio(video_path, output_path):
+# Types #
+class ExtractAudioResults(TypedDict):
+    elapsed_time: float
+    output_path: str
+
+# Functions #
+def extract_audio(video_path, output_path) -> ExtractAudioResults:
     """Extract audio from video file using moviepy."""
     print(f"Starting audio extraction from {video_path} to {output_path}")
     start_time = time.time()
@@ -35,7 +45,9 @@ def extract_audio(video_path, output_path):
     
     try:
         # Load the video file
-        video_clip = VideoFileClip(video_path)
+        # Hack: prevent clip.get_frame to print to stdout :/
+        with contextlib.redirect_stdout(io.StringIO()):
+            video_clip = VideoFileClip(video_path)
         
         # Extract the audio
         audio_clip = video_clip.audio
@@ -51,14 +63,14 @@ def extract_audio(video_path, output_path):
         processing_time = (end_time - start_time) * 1000  # Convert to ms
         
         print(f"Audio extraction completed in {processing_time:.2f}ms")
-        return output_path
+        return { "output_path": output_path, "elapsed_time": processing_time }
         
     except Exception as e:
         print(f"Error extracting audio: {str(e)}", file=sys.stderr)
         sys.exit(1)
 
-args = parser.parse_args()
 if __name__ == "__main__":
+    args = parser.parse_args()
     video_path = args.input
     output_path = args.output_path
     
