@@ -2,96 +2,111 @@ name: Build and Release
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
-  build-windows:
-    runs-on: ubuntu-latest
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, ubuntu-latest, windows-latest]
+        include:
+          - platform: macos-latest
+            os: darwin
+          - platform: ubuntu-latest
+            os: linux
+          - platform: windows-latest
+            os: win32
+    
+    runs-on: ${{ matrix.platform }}
+    
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          fetch-depth: 0
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Windows App
+          node-version: 18
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      
+      - name: Install Python dependencies
         run: |
-          docker build -t robotics-contributors-win -f Dockerfile.windows .
-          docker run --rm -v ${{ github.workspace }}/out:/app/out robotics-contributors-win
-
-      - name: Upload Windows Artifacts
+          python -m pip install --upgrade pip
+          python -m pip install moviepy opencv-python numpy
+      
+      - name: Package Application
+        run: npm run package
+      
+      - name: Run bundle-python script
+        env:
+          FORCE_PLATFORM: ${{ matrix.os }}
+        run: node scripts/bundle-python.js
+      
+      - name: Make Distributable
+        run: npm run make
+      
+      - name: List build artifacts
+        shell: bash
+        run: |
+          find out -type f -not -path "*/\.*" | grep -v "node_modules"
+      
+      - name: Prepare artifacts for upload
+        id: prepare-artifacts
+        shell: bash
+        run: |
+          mkdir -p ./artifacts
+          if [ "${{ matrix.platform }}" == "macos-latest" ]; then
+            cp -r out/make/zip/darwin/x64/*.zip ./artifacts/ || echo "No zip files found for macOS"
+            cp -r out/make/zip/darwin/arm64/*.zip ./artifacts/ || echo "No arm64 zip files found for macOS"
+          elif [ "${{ matrix.platform }}" == "ubuntu-latest" ]; then
+            cp -r out/make/deb/x64/*.deb ./artifacts/ || echo "No deb files found"
+            cp -r out/make/rpm/x64/*.rpm ./artifacts/ || echo "No rpm files found"
+            cp -r out/make/zip/linux/x64/*.zip ./artifacts/ || echo "No zip files found for Linux"
+          elif [ "${{ matrix.platform }}" == "windows-latest" ]; then
+            cp -r out/make/squirrel.windows/x64/*.exe ./artifacts/ || echo "No exe installer found"
+            cp -r out/make/zip/win32/x64/*.zip ./artifacts/ || echo "No zip files found for Windows"
+          fi
+          echo "Found artifacts:"
+          ls -la ./artifacts/
+      
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: robotics-contributors-windows
-          path: out/make/squirrel.windows/x64/
-
-  build-macos:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build macOS App
-        run: |
-          docker build -t robotics-contributors-mac -f Dockerfile.macos .
-          docker run --rm -v ${{ github.workspace }}/out:/app/out robotics-contributors-mac
-
-      - name: Upload macOS Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: robotics-contributors-mac
-          path: out/make/zip/darwin/x64/
-
-  build-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Linux App
-        run: |
-          docker build -t robotics-contributors-linux -f Dockerfile.linux .
-          docker run --rm -v ${{ github.workspace }}/out:/app/out robotics-contributors-linux
-
-      - name: Upload Linux Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: robotics-contributors-linux
-          path: out/make/deb/x64/
-
-  release:
-    needs: [build-windows, build-macos, build-linux]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: out
-
-      - name: List Output Directory (Debug)
-        run: find out -type f | sort
-
-      # - name: Create GitHub Release
-      #   uses: softprops/action-gh-release@v2
-      #   with:
-      #     tag_name: v${{ env.VERSION }}
-      #     name: Release v${{ env.VERSION }}
-      #     body: "Automated release of robotics-contributors v${{ env.VERSION }}"
-      #     draft: false
-      #     prerelease: false
-      #     files: out/**
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: robotics-contributors-${{ matrix.os }}
+          path: ./artifacts/
+          retention-days: 7
+  
+  # release:
+  #   needs: build
+  #   if: startsWith(github.ref, 'refs/tags/v')
+  #   runs-on: ubuntu-latest
+    
+  #   steps:
+  #     - name: Download all artifacts
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         path: ./artifacts
+      
+  #     - name: Display structure of downloaded files
+  #       run: ls -R ./artifacts
+      
+  #     - name: Create Release
+  #       uses: softprops/action-gh-release@v1
+  #       with:
+  #         draft: true
+  #         files: ./artifacts/**/*
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
