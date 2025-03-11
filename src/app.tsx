@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import './index.css'; // Import Tailwind CSS
 import App from './renderer/App';
 import ErrorBoundary from './renderer/components/ErrorBoundary';
+import { AuthProvider } from './renderer/hooks/useAuth';
 
 declare global {
     interface Window {
@@ -33,7 +34,9 @@ if (!rootElement) {
     const root = createRoot(rootElement); root.render(
         <React.StrictMode>
             <ErrorBoundary fallbackComponent={<CustomFallback />}>
-                <App />
+                <AuthProvider>
+                    <App />
+                </AuthProvider>
             </ErrorBoundary>
         </React.StrictMode>
     );
