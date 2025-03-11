@@ -19,11 +19,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   processMedia: (videoIds: string[]) =>
     ipcRenderer.invoke('process-media', videoIds),
 
+  // Auth methods
+  getAuth: () => ipcRenderer.invoke('get-auth'),
+  logout: () => ipcRenderer.invoke('logout'),
+
   // Event listeners
   onVideosUpdated: (callback: FunctionConstructor) =>
     ipcRenderer.on('videos-updated', (_event, data) => callback(data)),
   onMediaProcessed: (callback: FunctionConstructor) =>
     ipcRenderer.on('media-processed', (_event, data) => callback(data)),
+  onAuthChanged: (callback: FunctionConstructor) =>
+    ipcRenderer.on('auth-changed', (_event, data) => callback(data)),
   // Remove event listeners
   removeAllListeners: (channel: string) =>
     ipcRenderer.removeAllListeners(channel)

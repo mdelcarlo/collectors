@@ -1,6 +1,4 @@
-// main.ts
-
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, protocol } from 'electron';
 import path from 'path';
 import fs from 'fs/promises';
 import { VideoMatcher } from './main/services/videoMatcher';
@@ -8,6 +6,7 @@ import Store from 'electron-store';
 import { MetaGenerator } from './main/services/metaGenerator';
 import { MediaProcessor } from './main/services/mediaProcesor';
 import { VideoStatus } from './types';
+import jwt from 'jsonwebtoken';
 
 // Error handling setup
 process.on('uncaughtException', (err) => {
@@ -31,6 +30,7 @@ class StoreManager {
       defaults: {
         pairs: [],
         unpairedVideos: [],
+        auth: null
       }
     });
     // this.clear(); // Clear store on startup
@@ -41,6 +41,7 @@ class StoreManager {
     this.store.set({
       pairs: [],
       unpairedVideos: [],
+      auth: null
     });
   }
 
@@ -66,6 +67,19 @@ class StoreManager {
 
   updateUnpairedVideos(unpaired: any[]) {
     this.store.set('unpairedVideos', unpaired);
+  }
+
+  // Auth methods
+  getAuth(): any {
+    return this.store.get('auth');
+  }
+
+  setAuth(authData: any) {
+    this.store.set('auth', authData);
+  }
+
+  clearAuth() {
+    this.store.set('auth', null);
   }
 }
 
@@ -93,6 +107,58 @@ class DataManager {
     });
   }
 
+  // Notify the renderer process of auth changes
+  notifyAuthUpdated() {
+    this.mainWindow.webContents.send('auth-changed', {
+      auth: this.storeManager.getAuth()
+    });
+  }
+
+  // Process JWT token and extract user info
+  processAuthToken(token: string) {
+    try {
+      // Decode JWT token (without verification as we're just extracting info)
+      const decoded = jwt.decode(token);
+      
+      if (!decoded || typeof decoded !== 'object') {
+        console.error('Invalid token format');
+        return false;
+      }
+
+      // Extract username or relevant info from token
+      // Assuming the token has 'username' claim - adjust based on your JWT structure
+      const username = decoded.username || decoded.name || decoded.email || 'User';
+      
+      // Store auth data
+      this.storeManager.setAuth({
+        token,
+        username,
+        loggedIn: true,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Notify renderer process about auth change
+      this.notifyAuthUpdated();
+      
+      return true;
+    } catch (error) {
+      console.error('Error processing auth token:', error);
+      return false;
+    }
+  }
+
+  // Log out user
+  logout() {
+    this.storeManager.clearAuth();
+    this.notifyAuthUpdated();
+    return true;
+  }
+
+  // Get auth data
+  getAuthData() {
+    return this.storeManager.getAuth();
+  }
+
   // Update video state in pairs
   updateVideoState(video: any) {
     console.log('Updating video state:', video);
@@ -109,7 +175,7 @@ class DataManager {
   }
 
   // Process videos
-  async processVideos(videoIds: string[]) {
+  async processVideos(videoIds: string[], isResume = false) {
     try {
       const pairs = this.storeManager.getPairs();
       const unpaired = this.storeManager.getUnpairedVideos();
@@ -399,6 +465,15 @@ class IpcHandlerSetup {
     ipcMain.handle('get-all-videos', async () => {
       return this.dataManager.getAllVideos();
     });
+
+    // Auth handlers
+    ipcMain.handle('get-auth', async () => {
+      return this.dataManager.getAuthData();
+    });
+
+    ipcMain.handle('logout', async () => {
+      return this.dataManager.logout();
+    });
   }
 }
 
@@ -408,6 +483,7 @@ class Application {
   private windowManager: typeof WindowManager;
   private dataManager: DataManager;
   private ipcHandlerSetup: IpcHandlerSetup;
+  private mainWindow: BrowserWindow;
   
   constructor() {
     this.storeManager = new StoreManager(ENV);
@@ -418,12 +494,15 @@ class Application {
     try {
       // Handle Squirrel startup for Windows
       this.handleSquirrelStartup();
+
+      // Register protocol for deep linking
+      this.registerProtocolHandler();
       
       // Initialize application when Electron is ready
       app.whenReady().then(() => {
-        const mainWindow = this.windowManager.createWindow();
+        this.mainWindow = this.windowManager.createWindow();
         
-        this.dataManager = new DataManager(this.storeManager, mainWindow);
+        this.dataManager = new DataManager(this.storeManager, this.mainWindow);
         this.ipcHandlerSetup = new IpcHandlerSetup(this.dataManager);
         
         // Set up IPC handlers
@@ -431,12 +510,18 @@ class Application {
         
         // Resume processing of any videos in 'processing' state
         this.dataManager.resumeProcessingVideos();
+
+        // Check for auth in store and notify renderer
+        const authData = this.storeManager.getAuth();
+        if (authData) {
+          this.dataManager.notifyAuthUpdated();
+        }
         
         app.on('activate', () => {
           // On macOS it's common to re-create a window in the app when the
           // dock icon is clicked and there are no other windows open.
           if (BrowserWindow.getAllWindows().length === 0) {
-            this.windowManager.createWindow();
+            this.mainWindow = this.windowManager.createWindow();
           }
         });
       });
@@ -447,9 +532,68 @@ class Application {
           app.quit();
         }
       });
+
+      // Handle open-url events (deep linking)
+      app.on('open-url', (event, url) => {
+        event.preventDefault();
+        this.handleDeepLink(url);
+      });
     } catch (error) {
       console.error('Failed to start application:', error);
       process.exit(1);
+    }
+  }
+  
+  private registerProtocolHandler() {
+    if (process.defaultApp) {
+      if (process.argv.length >= 2) {
+        app.setAsDefaultProtocolClient('robotics-contributors', process.execPath, [
+          path.resolve(process.argv[1])
+        ]);
+      }
+    } else {
+      app.setAsDefaultProtocolClient('robotics-contributors');
+    }
+
+    // For Windows: handle protocol when app is already running
+    if (process.platform === 'win32') {
+      const gotTheLock = app.requestSingleInstanceLock();
+      
+      if (!gotTheLock) {
+        app.quit();
+        return;
+      }
+
+      app.on('second-instance', (event, commandLine) => {
+        // Someone tried to run a second instance, focus our window instead
+        if (this.mainWindow) {
+          if (this.mainWindow.isMinimized()) this.mainWindow.restore();
+          this.mainWindow.focus();
+        }
+
+        // Extract deeplink URL from second instance
+        const url = commandLine.find(arg => arg.startsWith('robotics-contributors://'));
+        if (url) {
+          this.handleDeepLink(url);
+        }
+      });
+    }
+  }
+
+  private handleDeepLink(url: string) {
+    try {
+      console.log('Handling deeplink URL:', url);
+      
+      // Check if this is an auth deeplink
+      if (url.includes('robotics-contributors://auth=')) {
+        const token = url.split('auth=')[1];
+        if (token && this.dataManager) {
+          const success = this.dataManager.processAuthToken(token);
+          console.log('Auth token processing:', success ? 'successful' : 'failed');
+        }
+      }
+    } catch (error) {
+      console.error('Error handling deeplink:', error);
     }
   }
   
