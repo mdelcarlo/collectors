@@ -129,7 +129,7 @@ class DataManager {
 
   // Notify the renderer process of auth changes
   notifyAuthUpdated() {
-    this.mainWindow.webContents.send('auth-changed', this.storeManager.getAuth());
+    this.mainWindow.webContents.send('auth-changed', {auth: this.storeManager.getAuth()});
   }
 
   // Process JWT token and extract user info
