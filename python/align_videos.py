@@ -2,10 +2,25 @@
 import argparse
 import json
 import numpy as np
-from audalign.config.fingerprint import FingerprintConfig
 import utils
 import time
 import audalign as ad
+import os
+import tempfile
+
+
+def is_video_file(file_path):
+    """Checks if a file is a video file based on its extension
+
+    Args:
+        file_path (str): Path to the file
+
+    Returns:
+        bool: True if the file is a video file, False otherwise
+    """
+    video_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm']
+    _, ext = os.path.splitext(file_path.lower())
+    return ext in video_extensions
 
 
 def parse_results(results):
@@ -46,7 +61,8 @@ class NpEncoder(json.JSONEncoder):
 
 
 def get_audio_offset(
-    files,
+    file1,
+    file2,
     destination=None,
     technique="correlation_spectrogram",
     filter_matches=10,
@@ -73,11 +89,13 @@ def get_audio_offset(
     fine_img_width=0.5,
     fine_volume_threshold=215
 ):
-    """Gets the offset of two audio files using fingerprints, correlation, or
-    visual techniques.
+    """Gets the offset between two audio or video files using fingerprints, correlation, or
+    visual techniques. The algorithm determines which file is the target (the one 
+    with a positive offset). If video files are provided, their audio will be extracted first.
     
     Args:
-        files (str): Path to directory with audio files to process
+        file1 (str): Path to the first audio or video file
+        file2 (str): Path to the second audio or video file
         destination (str, optional): Destination directory. Defaults to None.
         technique (str, optional): Alignment technique. Defaults to "correlation_spectrogram".
         filter_matches (int, optional): Only process on match counts greater than filter-matches. Defaults to 10.
@@ -111,6 +129,51 @@ def get_audio_offset(
     results = None
     multiprocessing = True
 
+    # Create a temporary directory to store the files
+    temp_dir = tempfile.mkdtemp()
+    
+    # Process the input files (extract audio if they are video files)
+    temp_files_to_cleanup = []
+    
+    # Extract audio from videos if needed
+    if is_video_file(file1):
+        # Create a temporary file with .wav extension
+        temp_file1 = tempfile.NamedTemporaryFile(suffix='.wav', delete=False)
+        audio_file1 = temp_file1.name
+        temp_file1.close()
+        
+        # Extract audio using utils function
+        temp_dir1 = os.path.dirname(audio_file1)
+        temp_output_path = utils.extract_audio_single(file1, temp_dir1)
+        # Get the actual path from the result
+        audio_file1 = os.path.join(temp_dir1, "audio.mp3")
+        temp_files_to_cleanup.append(audio_file1)
+    else:
+        audio_file1 = file1
+        
+    if is_video_file(file2):
+        # Create a temporary file with .wav extension
+        temp_file2 = tempfile.NamedTemporaryFile(suffix='.wav', delete=False)
+        audio_file2 = temp_file2.name
+        temp_file2.close()
+        
+        # Extract audio using utils function
+        temp_dir2 = os.path.dirname(audio_file2)
+        temp_output_path = utils.extract_audio_single(file2, temp_dir2)
+        # Get the actual path from the result
+        audio_file2 = os.path.join(temp_dir2, "audio.mp3")
+        temp_files_to_cleanup.append(audio_file2)
+    else:
+        audio_file2 = file2
+    
+    # Copy the audio files to the temporary directory
+    import shutil
+    file1_name = os.path.basename(audio_file1)
+    file2_name = os.path.basename(audio_file2)
+    
+    shutil.copy(audio_file1, os.path.join(temp_dir, file1_name))
+    shutil.copy(audio_file2, os.path.join(temp_dir, file2_name))
+
     if num_processors == 1:
         multiprocessing = False
     elif num_processors == 0:
@@ -132,11 +195,21 @@ def get_audio_offset(
         recognizer.config.volume_threshold = volume_threshold
         recognizer.config.img_width = img_width
     else:
+        # Clean up temp directory and files
+        shutil.rmtree(temp_dir)
+        for temp_file in temp_files_to_cleanup:
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
         raise ValueError(
             f"technique '{technique}' must be 'fingerprints', 'correlation', 'correlation_spectrogram', or 'visual'"
         )
     
     if not recognizer:
+        # Clean up temp directory and files
+        shutil.rmtree(temp_dir)
+        for temp_file in temp_files_to_cleanup:
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
         raise ValueError("No recognizer was created")
 
     recognizer.config.freq_threshold = threshold
@@ -148,8 +221,9 @@ def get_audio_offset(
     t = time.time()
 
     try:
+        # Use the temporary directory for alignment
         results = ad.align(
-            files,
+            temp_dir,
             destination_path=destination,
             write_extension=write_extension,
             write_multi_channel=write_multi_channel,
@@ -158,6 +232,11 @@ def get_audio_offset(
 
         if not results:
             print("No results found.")
+            # Clean up temp directory and files
+            shutil.rmtree(temp_dir)
+            for temp_file in temp_files_to_cleanup:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
             return None
 
         # cache fingerprints
@@ -169,12 +248,13 @@ def get_audio_offset(
             offset = results[filename]
             if offset > 0:
                 results['offset'] = (filename, offset)
+                target_file = path
 
                 if write_silence and results:
-                    dest = destination or files
+                    dest = destination or os.path.dirname(path)
                     ad.write_shifted_file(
                         path,
-                        dest + '/shifted_' + filename,
+                        os.path.join(dest, 'shifted_' + os.path.basename(path)),
                         offset_seconds=offset,
                         normalize=False,
                     )
@@ -184,7 +264,18 @@ def get_audio_offset(
     except KeyboardInterrupt:
         t = time.time() - t
         print(f"\nRan for {ad.seconds_to_min_hrs(t)}.")
+        # Clean up temp directory and files
+        shutil.rmtree(temp_dir)
+        for temp_file in temp_files_to_cleanup:
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
         return None
+    finally:
+        # Clean up temp directory and files
+        shutil.rmtree(temp_dir)
+        for temp_file in temp_files_to_cleanup:
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
 
     if results is not None and write_results:
         with open("last_results.json", "w") as f:
@@ -217,6 +308,12 @@ def get_audio_offset(
 
     output = parse_results(results)
     output['elapsed_time_seconds'] = ad.seconds_to_min_hrs(t)
+    
+    # Add original file information
+    output['original_files'] = {
+        'file1': file1,
+        'file2': file2
+    }
 
     if print_metrics:
         print()
@@ -228,8 +325,12 @@ def get_audio_offset(
 
 def main(args):
     """Main function to be called from command line"""
+    if len(args.files) != 2:
+        raise ValueError("Exactly two files must be provided")
+    
     return get_audio_offset(
-        files=args.files,
+        file1=args.files[0],
+        file2=args.files[1],
         destination=args.destination,
         technique=args.technique,
         filter_matches=args.filter_matches,
@@ -246,7 +347,7 @@ def main(args):
         sample_rate=args.sample_rate,
         accuracy=args.accuracy,
         hash_style=args.hash_style,
-        threshold=args.threshold,
+        threshold=args.freq_threshold,
         num_processors=args.num_processors,
         img_width=args.img_width,
         volume_threshold=args.volume_threshold,
@@ -259,12 +360,13 @@ def main(args):
 
 
 """Command line argument parser"""
-parser = argparse.ArgumentParser(description="Get the offset of an audio file respect to another.")
+parser = argparse.ArgumentParser(description="Get the offset between two audio or video files.")
 parser.add_argument(
     "-f",
     "--files",
     type=str,
-    help="directory to process",
+    nargs=2,
+    help="paths to the two audio or video files to compare",
     required=True,
 )
 parser.add_argument(
@@ -276,7 +378,6 @@ parser.add_argument(
     default=None,
 )
 parser.add_argument(
-    "-t",
     "--technique",
     type=str,
     help="alignment technique",
@@ -318,8 +419,8 @@ parser.add_argument(
 )
 parser.add_argument(
     "--print-metrics",
-    type=bool,
     help="If present, print some metrics",
+    action='store_true',
     required=False,
     default=False,
 )
@@ -372,8 +473,7 @@ parser.add_argument(
     default="panako_mod",
 )
 parser.add_argument(
-    "-r",
-    "--threshold",
+    "--freq-threshold",
     type=int,
     help="frequency threshold",
     required=False,
