@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import './index.css'; // Import Tailwind CSS
 import App from './renderer/App';
 import ErrorBoundary from './renderer/components/ErrorBoundary';
-import { AuthProvider } from './renderer/hooks/useAuth';
+import { AuthData, AuthProvider } from './renderer/hooks/useAuth';
 
 declare global {
     interface Window {
@@ -16,6 +16,10 @@ declare global {
             onVideosUpdated: (callback: (data: any) => void) => void;
             removeAllListeners: (channel: string) => void;
             onMediaProcessed: (callback: (data: any) => void) => void;
+            onAuthChanged: (callback: (data: {auth: AuthData}) => void) => void;
+            logout: () => Promise<any>;
+            getAuth: () => Promise<AuthData | null>;
+            getEnvironmentVariables: () => Promise<any>;
         };
     }
 }

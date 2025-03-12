@@ -8,6 +8,26 @@ import { MediaProcessor } from './main/services/mediaProcesor';
 import { VideoStatus } from './types';
 import jwt from 'jsonwebtoken';
 
+interface AuthData {
+  token: string;
+  username: string;
+  userId: string;
+  iat: number;
+  exp: number;
+  loggedIn: boolean;
+  timestamp: string;
+}
+
+interface JwtPayload {
+  userId?: string;
+  sub?: string;
+  username?: string;
+  name?: string;
+  email?: string;
+  iat?: number;
+  exp?: number;
+}
+
 // Error handling setup
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
@@ -70,11 +90,11 @@ class StoreManager {
   }
 
   // Auth methods
-  getAuth(): any {
-    return this.store.get('auth');
+  getAuth(): AuthData | null {
+    return this.store.get('auth') as AuthData | null;
   }
 
-  setAuth(authData: any) {
+  setAuth(authData: AuthData) {
     this.store.set('auth', authData);
   }
 
@@ -109,9 +129,7 @@ class DataManager {
 
   // Notify the renderer process of auth changes
   notifyAuthUpdated() {
-    this.mainWindow.webContents.send('auth-changed', {
-      auth: this.storeManager.getAuth()
-    });
+    this.mainWindow.webContents.send('auth-changed', this.storeManager.getAuth());
   }
 
   // Process JWT token and extract user info
@@ -133,8 +151,11 @@ class DataManager {
       this.storeManager.setAuth({
         token,
         username,
+        userId: decoded.userId,
+        iat: decoded.iat,
+        exp: decoded.exp,
         loggedIn: true,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
       
       // Notify renderer process about auth change
@@ -155,7 +176,7 @@ class DataManager {
   }
 
   // Get auth data
-  getAuthData() {
+  getAuthData(): AuthData | null {
     return this.storeManager.getAuth();
   }
 
@@ -441,6 +462,12 @@ class IpcHandlerSetup {
   }
   
   setup() {
+    ipcMain.handle('get-environment-variables', () => {
+      return {
+        PUBLIC_SCALE_URL: process.env.PUBLIC_SCALE_URL,
+      };
+    });
+
     // Handle video upload
     ipcMain.handle('upload-videos', async (_, autoMatchVideos = false) => {
       return this.dataManager.uploadVideos(autoMatchVideos);
@@ -582,8 +609,6 @@ class Application {
 
   private handleDeepLink(url: string) {
     try {
-      console.log('Handling deeplink URL:', url);
-      
       // Check if this is an auth deeplink
       if (url.includes('robotics-contributors://auth=')) {
         const token = url.split('auth=')[1];

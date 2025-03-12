@@ -25,6 +25,8 @@ import { Pair, Video } from 'src/types';
 import { Badge } from './components/Badge';
 import { calculateFps } from './utils/calculateFps';
 import Header from './components/Header';
+import useAuth from './hooks/useAuth';
+import LoginPage from './components/LoginPage';
 
 type TabType = 'paired' | 'unpaired' | 'processing' | 'processed';
 export type SortOption = 'date' | 'size' | 'name' | 'fps'
@@ -484,4 +486,26 @@ const App: React.FC = () => {
   );
 };
 
-export default App;
+const LoginWrapperApp: React.FC = () => {
+  const { isLoggedIn, isLoading: authLoading } = useAuth();
+
+  if (!isLoggedIn && !authLoading) {
+    return <LoginPage />;
+  }
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-300">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <App />;
+
+}
+
+export default LoginWrapperApp;
