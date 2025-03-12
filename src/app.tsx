@@ -22,6 +22,14 @@ declare global {
             getEnvironmentVariables: () => Promise<any>;
         };
     }
+
+    interface ImportMetaEnv {
+        readonly VITE_PUBLIC_SCALE_BACKEND_URL: string;
+        readonly VITE_PUBLIC_SCALE_URL: string;}
+    
+      interface ImportMeta {
+        readonly env: ImportMetaEnv;
+      }
 }
 
 const CustomFallback = () => (

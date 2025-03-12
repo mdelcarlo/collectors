@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MdAccountCircle, MdLogout } from 'react-icons/md';
 import { motion } from 'framer-motion';
+import { useUser } from '../hooks/useUser';
 
 interface UserMenuProps {
   username: string | null;
@@ -9,6 +10,7 @@ interface UserMenuProps {
 
 const UserMenu: React.FC<UserMenuProps> = ({ username, onLogout }) => {
   const [showMenu, setShowMenu] = useState(false);
+  const {user} = useUser()
 
   if (!username) {
     return (
@@ -26,7 +28,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ username, onLogout }) => {
         onClick={() => setShowMenu(!showMenu)}
       >
         <MdAccountCircle className="mr-2" size={20} />
-        <span>{username}</span>
+        <span>{user ? user.firstName : username}</span>
       </button>
 
       {showMenu && (
