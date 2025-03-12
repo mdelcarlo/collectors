@@ -10,7 +10,7 @@ interface UserMenuProps {
 
 const UserMenu: React.FC<UserMenuProps> = ({ username, onLogout }) => {
   const [showMenu, setShowMenu] = useState(false);
-  const {user} = useUser()
+  const { user, avatarUrl } = useUser()
 
   if (!username) {
     return (
@@ -23,11 +23,15 @@ const UserMenu: React.FC<UserMenuProps> = ({ username, onLogout }) => {
 
   return (
     <div className="relative">
-      <button 
+      <button
         className="flex items-center px-3 py-2 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
         onClick={() => setShowMenu(!showMenu)}
       >
-        <MdAccountCircle className="mr-2" size={20} />
+        <img
+          src={avatarUrl}
+          alt="User Avatar"
+          className="w-6 h-6 rounded-full mr-2"
+        />
         <span>{user ? user.firstName : username}</span>
       </button>
 

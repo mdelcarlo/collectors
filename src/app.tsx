@@ -4,6 +4,9 @@ import './index.css'; // Import Tailwind CSS
 import App from './renderer/App';
 import ErrorBoundary from './renderer/components/ErrorBoundary';
 import { AuthData, AuthProvider } from './renderer/hooks/useAuth';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const queryClient = new QueryClient();
 
 declare global {
     interface Window {
@@ -16,7 +19,7 @@ declare global {
             onVideosUpdated: (callback: (data: any) => void) => void;
             removeAllListeners: (channel: string) => void;
             onMediaProcessed: (callback: (data: any) => void) => void;
-            onAuthChanged: (callback: (data: {auth: AuthData}) => void) => void;
+            onAuthChanged: (callback: (data: { auth: AuthData }) => void) => void;
             logout: () => Promise<any>;
             getAuth: () => Promise<AuthData | null>;
             getEnvironmentVariables: () => Promise<any>;
@@ -25,11 +28,12 @@ declare global {
 
     interface ImportMetaEnv {
         readonly VITE_PUBLIC_SCALE_BACKEND_URL: string;
-        readonly VITE_PUBLIC_SCALE_URL: string;}
-    
-      interface ImportMeta {
+        readonly VITE_PUBLIC_SCALE_URL: string;
+    }
+
+    interface ImportMeta {
         readonly env: ImportMetaEnv;
-      }
+    }
 }
 
 const CustomFallback = () => (
@@ -47,7 +51,9 @@ if (!rootElement) {
         <React.StrictMode>
             <ErrorBoundary fallbackComponent={<CustomFallback />}>
                 <AuthProvider>
-                    <App />
+                    <QueryClientProvider client={queryClient}>
+                        <App />
+                    </QueryClientProvider>
                 </AuthProvider>
             </ErrorBoundary>
         </React.StrictMode>
