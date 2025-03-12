@@ -178,6 +178,7 @@ export class MediaProcessor {
               message: \`📄 Output filename: \${outputFilename}\`
             });
 
+            // Generate Sample Video
             try {
               const pythonScript = path.join(pythonScriptsDir, '/create_sample_video.py')
               parentPort.postMessage({ 
@@ -287,6 +288,8 @@ export class MediaProcessor {
               });
             }
           }
+
+        
           
           parentPort.postMessage({ 
             type: 'log', 
