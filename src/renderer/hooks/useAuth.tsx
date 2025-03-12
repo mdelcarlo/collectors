@@ -1,13 +1,13 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-interface AuthData {
+export interface AuthData {
   token: string;
   username: string;
   loggedIn: boolean;
   timestamp: string;
 }
 
-interface AuthContextType {
+export interface AuthContextType {
   auth: AuthData | null;
   isLoggedIn: boolean;
   username: string | null;
@@ -31,7 +31,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const loadAuth = async () => {
       try {
         const authData = await window.electronAPI.getAuth();
-        console.log('authData: ', authData);
         setAuth(authData);
       } catch (error) {
         console.error('Failed to load auth data:', error);
@@ -42,7 +41,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     loadAuth();
 
-    window.electronAPI.onAuthChanged((data: { auth: AuthData | null }) => {
+    window.electronAPI.onAuthChanged((data) => {
       setAuth(data.auth);
     });
 
