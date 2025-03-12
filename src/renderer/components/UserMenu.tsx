@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { MdAccountCircle, MdLogout } from 'react-icons/md';
 import { motion } from 'framer-motion';
 import { useUser } from '../hooks/useUser';
+import { useClickAway } from 'react-use';
 
 interface UserMenuProps {
   username: string | null;
@@ -10,7 +11,13 @@ interface UserMenuProps {
 
 const UserMenu: React.FC<UserMenuProps> = ({ username, onLogout }) => {
   const [showMenu, setShowMenu] = useState(false);
-  const { user, avatarUrl } = useUser()
+  const { user, avatarUrl } = useUser();
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Use clickAway from react-use to handle clicks outside the menu
+  useClickAway(menuRef, () => {
+    if (showMenu) setShowMenu(false);
+  });
 
   if (!username) {
     return (
@@ -22,7 +29,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ username, onLogout }) => {
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={menuRef}>
       <button
         className="flex items-center px-3 py-2 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
         onClick={() => setShowMenu(!showMenu)}
