@@ -95,3 +95,4 @@ out/
 #python
 __pycache__/
 venv
+/venv
