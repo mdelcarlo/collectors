@@ -32,18 +32,19 @@ def parse_results(results):
     Returns:
         Dictionary with metadata, target file, offset and ranking information
     """
-    output = {"_metadata": {}}
+    output = {}
 
-    for filename, path in results['names_and_paths'].items():
+    for filename, _path in results['names_and_paths'].items():
         # Save metadata
-        file_metadata = utils.get_audio_metadata(path)
-        output["_metadata"][filename] = file_metadata
+        # file_metadata = utils.get_audio_metadata(path)
+        # output["_metadata"][filename] = file_metadata
 
         file_offset = results[filename]
         if file_offset > 0:
             output['target'] = filename
-            output['offset'] = file_offset
-            output['ranking'] = list(results['rankings']['match_info']
+            output['offset'] = file_offset * 1000  # Convert to milliseconds
+            # Note that "confidence" to us is what the library calls "ranking"
+            output['confidence'] = list(results['rankings']['match_info']
                                      [filename].values())[0]
     return output
 
@@ -63,6 +64,7 @@ class NpEncoder(json.JSONEncoder):
 def get_audio_offset(
     file1,
     file2,
+    results_filepath=None,
     destination=None,
     technique="correlation_spectrogram",
     filter_matches=10,
@@ -87,7 +89,7 @@ def get_audio_offset(
     fine_locality=None,
     fine_sample_rate=8000,
     fine_img_width=0.5,
-    fine_volume_threshold=215
+    fine_volume_threshold=215,
 ):
     """Gets the offset between two audio or video files using fingerprints, correlation, or
     visual techniques. The algorithm determines which file is the target (the one 
@@ -96,6 +98,8 @@ def get_audio_offset(
     Args:
         file1 (str): Path to the first audio or video file
         file2 (str): Path to the second audio or video file
+        result_dir (str, optional): Path to the directory where the result file
+        will be saved. Defaults to None.
         destination (str, optional): Destination directory. Defaults to None.
         technique (str, optional): Alignment technique. Defaults to "correlation_spectrogram".
         filter_matches (int, optional): Only process on match counts greater than filter-matches. Defaults to 10.
@@ -277,9 +281,6 @@ def get_audio_offset(
             if os.path.exists(temp_file):
                 os.remove(temp_file)
 
-    if results is not None and write_results:
-        with open("last_results.json", "w") as f:
-            json.dump(results, f, cls=NpEncoder)
 
     # --------------------------------------------------------------------------
 
@@ -307,16 +308,13 @@ def get_audio_offset(
             )
 
     output = parse_results(results)
-    output['elapsed_time_seconds'] = ad.seconds_to_min_hrs(t)
+    output['elapsed_time_seconds'] = t
     
-    # Add original file information
-    output['original_files'] = {
-        'file1': file1,
-        'file2': file2
-    }
+    if output is not None and results_filepath:
+        with open(results_filepath, "w") as f:
+            json.dump(output, f, cls=NpEncoder)
 
     if print_metrics:
-        print()
         print('Results:')
         print(output)
 
@@ -331,11 +329,11 @@ def main(args):
     return get_audio_offset(
         file1=args.files[0],
         file2=args.files[1],
+        results_filepath=args.results_filepath,
         destination=args.destination,
         technique=args.technique,
         filter_matches=args.filter_matches,
         locality=args.locality,
-        write_results=args.write_results,
         min_duration=args.min_duration,
         write_silence=args.write_silence,
         print_metrics=args.print_metrics,
@@ -373,6 +371,13 @@ parser.add_argument(
     "-d",
     "--destination",
     help="destination directory",
+    type=str,
+    required=False,
+    default=None,
+)
+parser.add_argument(
+    "--results-filepath",
+    help="path to the directory where the result file will be saved",
     type=str,
     required=False,
     default=None,
