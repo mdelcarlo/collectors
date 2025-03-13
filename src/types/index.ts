@@ -1,4 +1,4 @@
-export type VideoStatus = 'idle' | 'processing' | 'processed' | 'error';
+export type VideoStatus = "idle" | "processing" | "processed" | "error";
 
 export interface Video {
   id: string;
@@ -13,12 +13,12 @@ export interface Video {
   frameCount?: number;
   width?: number;
   height?: number;
-  checksum?: string;  
+  checksum?: string;
   processingTime?: number;
   startProcessingTime?: number;
   status: VideoStatus;
   error?: string;
-  preview?: string
+  preview?: string;
 }
 
 export interface Pair {
@@ -26,6 +26,7 @@ export interface Pair {
   video1: Video;
   video2: Video;
   createdAt: Date;
+  alignment?: { offset: number; target: string; condidence: number };
 }
 
 export interface Audio {
