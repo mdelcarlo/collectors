@@ -26,7 +26,7 @@ export interface Pair {
   video1: Video;
   video2: Video;
   createdAt: Date;
-  alignment?: { offset: number; target: string; condidence: number };
+  alignment?: { offset: number; target: string; confidence: number };
 }
 
 export interface Audio {
