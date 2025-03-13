@@ -22,7 +22,7 @@ const LoginPage: React.FC = () => {
   }, []);
 
   const handleLogin = () => {
-    const redirectUrl = encodeURIComponent('robotics_collector_app');
+    const redirectUrl = encodeURIComponent('/robotics');
     const loginUrl = `${scaleUrl}/corp/login?redirect_url=${redirectUrl}`;
 
     // Store reference to the window
