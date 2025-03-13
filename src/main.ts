@@ -64,6 +64,11 @@ class StoreManager {
       pairs: [],
       unpairedVideos: [],
       auth: null
+
+  clearVideos() {
+    this.store.set({
+      pairs: [],
+      unpairedVideos: [],
     });
   }
 
@@ -514,6 +519,9 @@ class IpcHandlerSetup {
     // Log handler
     ipcMain.on('log:message', (_, message) => {
       logger.log(message);
+    // Remove all videos data
+    ipcMain.handle('remove-all-videos', async () => {
+      return this.dataManager.removeAllVideos();
     });
   }
 }
@@ -661,4 +669,3 @@ class Application {
 
 // Start the application
 const application = new Application();
-application.start();
