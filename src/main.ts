@@ -29,6 +29,7 @@ interface JwtPayload {
   iat?: number;
   exp?: number;
 }
+import { AlignmentResult } from './types/processors';
 
 // Error handling setup
 process.on('uncaughtException', (err) => {
@@ -80,12 +81,27 @@ class StoreManager {
     this.store.set(key, value);
   }
 
+  getPairByVideoId(videoId: string) {
+    return this.store.get('pairs').find(p => p.video1.id === videoId || p.video2.id === videoId);
+  }
+
   getPairs(): any[] {
     return this.store.get('pairs') as any[];
   }
 
   getUnpairedVideos(): any[] {
     return this.store.get('unpairedVideos') as any[];
+  }
+
+  updatePair(pair: any) {
+    const pairs = this.store.get('pairs') as any[];
+    const existing = pairs.find(p => p.id === pair.id);
+    if (!existing) {
+      console.error('Pair not found', pair);
+      throw new Error('Pair not found');
+    }
+    const updatedPairs = pairs.map(p => (p.id === pair.id ? pair : p));
+    this.store.set('pairs', updatedPairs);
   }
 
   updatePairs(pairs: any[]) {
@@ -110,6 +126,29 @@ class StoreManager {
   }
 }
 
+type ProcessType = 'update-video' | 'align-video-pair';
+type ProcessHandler = (data: any) => void;
+
+type Process = {
+  type: ProcessType;
+  handler: ProcessHandler;
+};
+
+class ProcessManager {
+  private processes: Process[] = [];
+
+  constructor(handlers: Process[]) {
+    this.processes.push(...handlers);
+  }
+
+  handleProcess(type: ProcessType, data: any) {
+    const process = this.processes.find(p => p.type === type);
+    if (process) {
+      process.handler(data);
+    }
+  }
+}
+
 // Application data manager
 class DataManager {
   private storeManager: StoreManager;
@@ -117,6 +156,7 @@ class DataManager {
   private metaGenerator: MetaGenerator;
   private videoMatcher: VideoMatcher;
   private mediaProcessor: MediaProcessor;
+  private processManager: ProcessManager;
 
   constructor(storeManager: StoreManager, mainWindow: BrowserWindow) {
     this.storeManager = storeManager;
@@ -124,13 +164,47 @@ class DataManager {
     this.metaGenerator = new MetaGenerator(mainWindow);
     this.videoMatcher = new VideoMatcher();
     this.mediaProcessor = new MediaProcessor();
+    this.processManager = new ProcessManager(this.getProcessHandlers());
+  }
+
+  private getProcessHandlers() {
+    const handlers = [
+      {
+        type: 'process-error',
+        handler: this.updateVideoState.bind(this),
+      },
+      {
+        type: 'update-video',
+        handler: this.updateVideoState.bind(this),
+      },
+      {
+        type: 'align-video-pair',
+        handler: (data: AlignmentResult) => {
+          console.log('align handler', data);
+          const pair = this.storeManager.getPairByVideoId(data.target);
+          if (!pair) {
+            console.error('Pair not found for video:', data.target);
+            return;
+          }
+          const alignment = {
+            offset: data.offset,
+            confidence: data.confidence,
+            target: data.target,
+            elapsedTimeSeconds: data.elapsed_time_seconds,
+          };
+          pair.alignment = alignment;
+          this.storeManager.updatePair(pair);
+        },
+      },
+    ] as Process[];
+    return handlers;
   }
 
   // Notify the renderer process of data updates
   notifyDataUpdated() {
     this.mainWindow.webContents.send('videos-updated', {
       pairs: this.storeManager.getPairs(),
-      unpairedVideos: this.storeManager.getUnpairedVideos()
+      unpairedVideos: this.storeManager.getUnpairedVideos(),
     });
   }
 
@@ -247,27 +321,11 @@ class DataManager {
 
       // Process each batch of videos
       for (const videos of Object.values(videosToProcessGroupedByPair)) {
-        const results = await this.mediaProcessor.processBatch(
+        await this.mediaProcessor.processBatch(
           videos,
-          this.updateVideoState.bind(this)
+          this.processManager.handleProcess.bind(this.processManager),
         );
-
-        // Mark processed videos
-        results.forEach(result => {
-          result.status = 'processed';
-        });
-
-        // Update pairs with processed video results
-        updatedPairs = this.storeManager.getPairs().map(pair => ({
-          ...pair,
-          video1: results.find(r => r.id === pair.video1.id) || pair.video1,
-          video2: results.find(r => r.id === pair.video2.id) || pair.video2
-        }));
-
-        this.storeManager.updatePairs(updatedPairs);
-
         // Notify renderer about the updates
-        this.mainWindow.webContents.send('media-processed', results);
         this.notifyDataUpdated();
       }
 
