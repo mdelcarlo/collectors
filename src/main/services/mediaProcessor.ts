@@ -6,6 +6,11 @@ import { Video } from "src/types";
 import { platform } from "os";
 import { logger } from "./loggerService";
 import { AlignmentResult } from "src/types/processors";
+import path from 'path';
+import fs from 'fs/promises';
+import { app } from 'electron';
+import { Worker } from 'worker_threads';
+import { AlignmentResult } from 'src/types/processors';
 
 export class MediaProcessor {
   private outputDir: string;
@@ -130,6 +135,8 @@ export class MediaProcessor {
     `);
 
     return new Promise((resolve) => {
+  async processBatch(videos: any[], onEvent: (type: string, data: any) => void): Promise<void> {
+    return new Promise(resolve => {
       // Create a worker for media processing
       const worker = new Worker(
         `
@@ -402,29 +409,29 @@ export class MediaProcessor {
           resolve(results);
       worker.on("message", (message) => {
         switch (message.type) {
-          case "align-video-pair": {
-            onEvent("align-video-pair", message.results as AlignmentResult);
+          case 'align-video-pair': {
+            onEvent('align-video-pair', message.results as AlignmentResult);
             break;
           }
-          case "create-sample-video": {
-            message.video.status = "processed";
-            onEvent("update-video", message.video);
+          case 'create-sample-video': {
+            message.video.status = 'processed';
+            onEvent('update-video', message.video);
             break;
           }
-          case "error": {
+          case 'error': {
             const video = message.video;
-            video.error = message.error || "Unknown error";
-            video.status = "idle";
+            video.error = message.error || 'Unknown error';
+            video.status = 'idle';
             video.startProcessingTime = undefined;
-            onEvent("process-error", video);
+            onEvent('process-error', video);
             break;
           }
-          case "complete": {
+          case 'complete': {
             resolve();
             break;
           }
-          case "init": {
-            onEvent("update-video", message.video);
+          case 'init': {
+            onEvent('update-video', message.video);
             break;
           }
           default: {
@@ -441,7 +448,7 @@ export class MediaProcessor {
         resolve();
       });
 
-      worker.on("exit", (code) => {
+      worker.on('exit', code => {
         if (code !== 0) {
           logger.log(`⚠️ Worker stopped with exit code ${code}`);
         } else {
