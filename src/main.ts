@@ -32,7 +32,7 @@ interface JwtPayload {
 import { AlignmentResult } from './types/processors';
 
 // Error handling setup
-process.on('uncaughtException', (err) => {
+process.on('uncaughtException', err => {
   console.error('Uncaught Exception:', err);
 });
 
@@ -40,7 +40,7 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
-const ENV = process.env.NODE_ENV
+const ENV = process.env.NODE_ENV;
 const isDev = ENV === 'development';
 
 // Initialize store for persistent data
@@ -53,8 +53,8 @@ class StoreManager {
       defaults: {
         pairs: [],
         unpairedVideos: [],
-        auth: null
-      }
+        auth: null,
+      },
     });
     this.clear(); // Clear store on startup
   }
@@ -64,7 +64,7 @@ class StoreManager {
     this.store.set({
       pairs: [],
       unpairedVideos: [],
-      auth: null
+      auth: null,
     });
   }
 
@@ -182,7 +182,6 @@ class DataManager {
       {
         type: 'align-video-pair',
         handler: (data: AlignmentResult) => {
-          console.log('align handler', data);
           const pair = this.storeManager.getPairByVideoId(data.target);
           if (!pair) {
             console.error('Pair not found for video:', data.target);
@@ -274,7 +273,7 @@ class DataManager {
     const updatedPairs = pairs.map(pair => ({
       ...pair,
       video1: pair.video1.id === video.id ? video : pair.video1,
-      video2: pair.video2.id === video.id ? video : pair.video2
+      video2: pair.video2.id === video.id ? video : pair.video2,
     }));
 
     this.storeManager.updatePairs(updatedPairs);
@@ -304,12 +303,12 @@ class DataManager {
         ...pair,
         video1: {
           ...pair.video1,
-          ...videoIds.includes(pair.video1.id) ? { status: 'processing' } : {},
+          ...(videoIds.includes(pair.video1.id) ? { status: 'processing' } : {}),
         },
         video2: {
           ...pair.video2,
-          ...videoIds.includes(pair.video2.id) ? { status: 'processing' } : {},
-        }
+          ...(videoIds.includes(pair.video2.id) ? { status: 'processing' } : {}),
+        },
       }));
 
       this.storeManager.updatePairs(updatedPairs);
@@ -336,7 +335,7 @@ class DataManager {
       console.error('Error processing media:', error);
       this.mainWindow.webContents.send('processing-error', {
         type: 'media',
-        error: error.message
+        error: error.message,
       });
       return false;
     }
@@ -361,7 +360,10 @@ class DataManager {
 
       // Find videos that were in processing state
       const videosToProcess = existingPairs
-        .flatMap(p => [{ ...p.video1, pairId: p.id }, { ...p.video2, pairId: p.id }])
+        .flatMap(p => [
+          { ...p.video1, pairId: p.id },
+          { ...p.video2, pairId: p.id },
+        ])
         .filter(video => video.status === 'processing');
 
       if (videosToProcess.length === 0) return;
@@ -377,7 +379,7 @@ class DataManager {
   async uploadVideos(autoMatchVideos = false) {
     const result = await dialog.showOpenDialog({
       properties: ['openFile', 'multiSelections'],
-      filters: [{ name: 'Videos', extensions: ['mp4', 'avi', 'mov', 'mkv', 'insv'] }]
+      filters: [{ name: 'Videos', extensions: ['mp4', 'avi', 'mov', 'mkv', 'insv'] }],
     });
     logger.log('Uploading videos...', result);
 
@@ -391,7 +393,7 @@ class DataManager {
 
     // Process new videos
     const newVideos = await Promise.all(
-      result.filePaths.map(async (filePath) => {
+      result.filePaths.map(async filePath => {
         const stats = await fs.stat(filePath);
         return {
           id: path.basename(filePath),
@@ -401,9 +403,9 @@ class DataManager {
           paired: false,
           pairId: null,
           size: stats.size,
-          status: 'idle' as VideoStatus
+          status: 'idle' as VideoStatus,
         };
-      })
+      }),
     );
     logger.log('newVideos :', newVideos);
 
@@ -419,9 +421,10 @@ class DataManager {
     }
 
     // Try to match new videos with existing unpaired videos
-    const { pairs: newPairs, unpaired: remainingUnpaired } = await this.videoMatcher.matchVideos(
-      [...existingUnpaired, ...videosWithMeta]
-    );
+    const { pairs: newPairs, unpaired: remainingUnpaired } = await this.videoMatcher.matchVideos([
+      ...existingUnpaired,
+      ...videosWithMeta,
+    ]);
 
     // Combine existing pairs with new pairs
     const updatedPairs = [...existingPairs, ...newPairs];
@@ -485,7 +488,7 @@ class DataManager {
     this.storeManager.updateUnpairedVideos([
       ...unpaired,
       { ...pair.video1, paired: false, pairId: null },
-      { ...pair.video2, paired: false, pairId: null }
+      { ...pair.video2, paired: false, pairId: null },
     ]);
 
     this.notifyDataUpdated();
@@ -497,7 +500,7 @@ class DataManager {
     return {
       pairs: this.storeManager.getPairs(),
       unpairedVideos: this.storeManager.getUnpairedVideos(),
-      extractedAudios: this.storeManager.get('extractedAudios')
+      extractedAudios: this.storeManager.get('extractedAudios'),
     };
   }
 }
@@ -520,7 +523,7 @@ class WindowManager {
     if (isDev) {
       mainWindow.loadURL('http://localhost:5173');
     } else {
-      mainWindow.loadFile(path.join(__dirname, "../../../dist/renderer/index.html"));
+      mainWindow.loadFile(path.join(__dirname, '../../../dist/renderer/index.html'));
     }
 
     return mainWindow;
@@ -660,7 +663,7 @@ class Application {
     if (process.defaultApp) {
       if (process.argv.length >= 2) {
         app.setAsDefaultProtocolClient('robotics-contributors', process.execPath, [
-          path.resolve(process.argv[1])
+          path.resolve(process.argv[1]),
         ]);
       }
     } else {
