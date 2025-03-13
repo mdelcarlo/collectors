@@ -65,6 +65,8 @@ class StoreManager {
       pairs: [],
       unpairedVideos: [],
       auth: null
+    });
+  }
 
   clearVideos() {
     this.store.set({
