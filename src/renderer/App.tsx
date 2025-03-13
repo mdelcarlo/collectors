@@ -226,27 +226,34 @@ const App: React.FC = () => {
             <nav className="flex gap-4 mb-4 border-b pb-2">
               <button
                 onClick={() => setActiveTab('unpaired')}
-                className={getTabClassName('unpaired')}
+                className={`${getTabClassName('unpaired')} px-4 py-2 inline-flex items-center justify-between gap-2`}
               >
-                Unpaired Videos <Badge>{unpairedVideos.length}</Badge>
+                <span>Unpaired Videos</span>
+                <Badge>{unpairedVideos.length}</Badge>
               </button>
+
               <button
                 onClick={() => setActiveTab('paired')}
-                className={getTabClassName('paired')}
+                className={`${getTabClassName('paired')} px-4 py-2 inline-flex items-center justify-between gap-2`}
               >
-                Paired Videos <Badge>{pairedVideos.length * 2} ({pairedVideos.length})</Badge>
+                <span>Paired Videos</span>
+                <Badge>{pairedVideos.length * 2}</Badge>
               </button>
+
               <button
                 onClick={() => setActiveTab('processing')}
-                className={getTabClassName('processing')}
+                className={`${getTabClassName('processing')} px-4 py-2 inline-flex items-center justify-between gap-2`}
               >
-                Processing Videos <Badge>{pairedProcessingVideos.length * 2}</Badge>
+                <span>Processing Videos</span>
+                <Badge>{pairedProcessingVideos.length * 2}</Badge>
               </button>
+
               <button
                 onClick={() => setActiveTab('processed')}
-                className={getTabClassName('processed')}
+                className={`${getTabClassName('processed')} px-4 py-2 inline-flex items-center justify-between gap-2`}
               >
-                Processed Videos <Badge>{pairedProcessedVideos.length * 2}</Badge>
+                <span>Processed Videos</span>
+                <Badge>{pairedProcessedVideos.length * 2}</Badge>
               </button>
             </nav>
             <div className="flex gap-4 mb-4">
