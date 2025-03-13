@@ -5,6 +5,7 @@ import { Worker } from "worker_threads";
 import { Video } from "src/types";
 import { platform } from "os";
 import { logger } from "./loggerService";
+import { AlignmentResult } from "src/types/processors";
 
 export class MediaProcessor {
   private outputDir: string;
@@ -132,6 +133,7 @@ export class MediaProcessor {
       // Create a worker for media processing
       const worker = new Worker(
         `
+        const fs = require('fs/promises')
         const { parentPort, workerData } = require('worker_threads');
         const path = require('path');
         const { exec } = require('child_process');
@@ -246,6 +248,63 @@ export class MediaProcessor {
           }
         }
 
+
+        async function alignVideos() {
+          async function createRandomTempFile() {
+            const os = require('os');
+            const tempDir = path.join(os.tmpdir(), 'cb-app-temp');
+            
+            await fs.mkdir(tempDir, { recursive: true });
+
+            const randomName = Math.random().toString(36).substring(2);
+            
+            const filePath = path.join(tempDir, randomName);
+            
+            const fileHandle = await fs.open(filePath, 'w');
+            await fileHandle.close();
+            
+            return filePath;
+          }
+
+
+          async function readJsonFile(filePath) {
+            try {
+              const data = await fs.readFile(filePath, "utf-8");
+              return JSON.parse(data);
+            } catch (error) {
+              console.error("Error reading JSON file:", error);
+            }
+          }
+
+          const { videos, pythonScriptsDir } = workerData;
+          const filenames = videos.map(video => video.path).slice(0, 2).join(' ');
+
+          console.log('Aligning videos...', filenames);
+
+          let results
+          const tempFile = await createRandomTempFile();
+          try {
+            const pythonScript = path.join(pythonScriptsDir, 'align_videos.py');
+
+            const command = \`python "\${pythonScript}" -f \${filenames} --results-filepath \${tempFile}\`;
+            const { stdout, stderr } = await execAsync(command);
+
+            if (stderr) {
+              console.error('Python stderr:', stderr);
+            }
+            results = await readJsonFile(tempFile);
+
+            parentPort.postMessage({ type: 'align-video-pair', results });
+
+          } catch (err) { 
+            console.error('error aligning videos', err)
+            throw err;
+          } finally {
+            await fs.rm(tempFile, { recursive: true, force: true });
+          }
+          return results
+        }
+
         async function processBatch() {
           const { videos, audioDir, thumbnailsDir, pythonScriptsDir, pythonPath } = workerData;
           const results = [];
@@ -275,6 +334,7 @@ export class MediaProcessor {
               });
               
               parentPort.postMessage({ type: 'progress', video: processedVideo });
+              parentPort.postMessage({ type: 'create-sample-video', video: processedVideo });
             } catch (error) {
               parentPort.postMessage({ 
                 type: 'log', 
@@ -298,8 +358,12 @@ export class MediaProcessor {
           
           parentPort.postMessage({ type: 'complete', results });
         }
-        
-        processBatch();
+
+        Promise.all([processBatch(), alignVideos()])
+          .then(_=> {
+            parentPort.postMessage({ type: 'complete' })
+          });
+
       `,
         {
           eval: true,
@@ -336,6 +400,36 @@ export class MediaProcessor {
         } else if (message.type === "complete") {
           logger.log(`✅ Media processing complete - ${results.length} videos processed successfully`);
           resolve(results);
+      worker.on("message", (message) => {
+        switch (message.type) {
+          case "align-video-pair": {
+            onEvent("align-video-pair", message.results as AlignmentResult);
+            break;
+          }
+          case "create-sample-video": {
+            message.video.status = "processed";
+            onEvent("update-video", message.video);
+            break;
+          }
+          case "error": {
+            const video = message.video;
+            video.error = message.error || "Unknown error";
+            video.status = "idle";
+            video.startProcessingTime = undefined;
+            onEvent("process-error", video);
+            break;
+          }
+          case "complete": {
+            resolve();
+            break;
+          }
+          case "init": {
+            onEvent("update-video", message.video);
+            break;
+          }
+          default: {
+            onEvent(message.type, message.results);
+          }
         }
       });
 
@@ -343,6 +437,8 @@ export class MediaProcessor {
         logger.log(`❌ Worker error: ${err.message}`);
         logger.log(`⚠️ Resolving with partial results (${results.length} videos)`);
         resolve(results);
+        console.error("Worker error:", err);
+        resolve();
       });
 
       worker.on("exit", (code) => {
@@ -351,7 +447,7 @@ export class MediaProcessor {
         } else {
           logger.log(`👋 Worker thread exited cleanly`);
         }
-        resolve(results);
+        resolve();
       });
     });
   }
