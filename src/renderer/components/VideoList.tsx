@@ -192,4 +192,4 @@ const VideoList: React.FC<VideoListProps> = ({
   );
 };
 
-export default VideoList;
+export default React.memo(VideoList);

@@ -5,12 +5,12 @@ import VideoList from './components/VideoList';
 import DragDropArea from './components/DragDropArea';
 import { Select } from './components/Select';
 import ProcessingIndicator from './components/ProcessingIndicator';
+import Sidebar from './components/Sidebar';
 
 import {
   MdLink,
   MdMoreVert,
   MdVideoCameraFront,
-  MdVideoLibrary,
   MdAutoFixHigh,
   MdImportantDevices,
   MdDialpad,
@@ -18,7 +18,6 @@ import {
   MdGridView,
   MdViewList,
 } from 'react-icons/md';
-import { BiBot } from "react-icons/bi";
 
 import { motion } from 'framer-motion';
 import { Pair, Video } from 'src/types';
@@ -27,6 +26,7 @@ import { calculateFps } from './utils/calculateFps';
 import Header from './components/Header';
 import useAuth from './hooks/useAuth';
 import LoginPage from './components/LoginPage';
+import MainContentContainer from './components/MainContentContainer';
 
 type TabType = 'paired' | 'unpaired' | 'processing' | 'processed';
 export type SortOption = 'date' | 'size' | 'name' | 'fps'
@@ -211,55 +211,16 @@ const App: React.FC = () => {
 
   return (
     <div className="flex w-full bg-gray-50 dark:bg-gray-900 min-h-screen">
-      {/* Left wrapper containing sidebar and header */}
-      <div className="fixed left-0 flex flex-col w-64 h-screen bg-white dark:bg-gray-800">
-        {/* App title/logo section */}
-        <div className="p-4 max-h-14">
-          <div className="flex items-center gap-2 text-xl font-bold text-gray-800 dark:text-white">
-            <BiBot className="text-blue-600" size={30} />
-            <span className="text-sm">Robotics Training Assistant</span>
-          </div>
-        </div>
-
-        {/* Navigation menu */}
-        <nav className="flex-1 p-4 border-r dark:border-gray-700">
-          <button
-            onClick={() => setActiveSection('videos')}
-            className={`w-full flex items-center gap-2 p-3 rounded-lg mb-2 ${activeSection === 'videos'
-              ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600'
-              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-              }`}
-          >
-            <MdVideoLibrary size={20} />
-            <span>Videos</span>
-          </button>
-          <button
-            onClick={() => setActiveSection('tasks')}
-            className={`w-full flex items-center gap-2 p-3 rounded-lg mb-2 ${activeSection === 'tasks'
-              ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600'
-              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-              }`}
-          >
-            <MdTask size={20} />
-            <span>Tasks</span>
-            <span className="ml-auto text-xs bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded-full">
-              Soon
-            </span>
-          </button>
-        </nav>
-      </div>
+      <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} />
 
       {/* Main Content */}
-      {/* Main content area */}
-      <div className="ml-64 flex-1 flex flex-col">
-        {/* Header */}
+      <MainContentContainer>
         <Header
           activeSection={activeSection}
           isLoading={isLoading}
           onUpload={handleUpload}
         />
 
-        {/* Main content */}
         {activeSection === 'videos' && (
           <main className="flex-1 p-4">
             <nav className="flex gap-4 mb-4 border-b pb-2">
@@ -481,7 +442,7 @@ const App: React.FC = () => {
             }}
           />
         )}
-      </div>
+      </MainContentContainer>
     </div>
   );
 };
