@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import { VideoMatcher } from './main/services/videoMatcher';
 import Store from 'electron-store';
 import { MetaGenerator } from './main/services/metaGenerator';
-import { MediaProcessor } from './main/services/mediaProcesor';
+import { MediaProcessor } from './main/services/mediaProcessor';
 import { VideoStatus } from './types';
 import jwt from 'jsonwebtoken';
 import { logger } from './main/services/loggerService';
