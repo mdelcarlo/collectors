@@ -433,7 +433,7 @@ class DataManager {
 class WindowManager {
   static createWindow(): BrowserWindow {
     const mainWindow = new BrowserWindow({
-      minWidth:350,
+      minWidth: 700,
       width: 1200,
       height: 800,
       webPreferences: {
