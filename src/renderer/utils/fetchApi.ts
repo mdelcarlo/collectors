@@ -11,7 +11,8 @@ export async function fetchApi(
     const mergedHeaders = {
       'Content-Type': 'application/json',
     };
-    const csrf = getCookie('_csrf') || '';
+    
+    const csrf = localStorage.getItem('csrf_token') || getCookie('_csrf') || '';
 
     const response = await fetch(`${baseUrl}${endpoint}`, {
       cache,

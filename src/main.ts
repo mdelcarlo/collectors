@@ -10,6 +10,7 @@ import jwt from 'jsonwebtoken';
 
 interface AuthData {
   token: string;
+  csrf: string;
   username: string;
   userId: string;
   iat: number;
@@ -129,15 +130,17 @@ class DataManager {
 
   // Notify the renderer process of auth changes
   notifyAuthUpdated() {
-    this.mainWindow.webContents.send('auth-changed', {auth: this.storeManager.getAuth()});
+    this.mainWindow.webContents.send('auth-changed', { auth: this.storeManager.getAuth() });
   }
 
   // Process JWT token and extract user info
-  processAuthToken(token: string) {
+  processAuthToken(token: string, csrf: string) {
+    console.log('csrf: ', csrf);
+    console.log('token: ', token);
     try {
       // Decode JWT token (without verification as we're just extracting info)
       const decoded = jwt.decode(token);
-      
+
       if (!decoded || typeof decoded !== 'object') {
         console.error('Invalid token format');
         return false;
@@ -146,10 +149,11 @@ class DataManager {
       // Extract username or relevant info from token
       // Assuming the token has 'username' claim - adjust based on your JWT structure
       const username = decoded.username || decoded.name || decoded.email || 'User';
-      
+
       // Store auth data
       this.storeManager.setAuth({
         token,
+        csrf,
         username,
         userId: decoded.userId,
         iat: decoded.iat,
@@ -157,10 +161,10 @@ class DataManager {
         loggedIn: true,
         timestamp: new Date().toISOString(),
       });
-      
+
       // Notify renderer process about auth change
       this.notifyAuthUpdated();
-      
+
       return true;
     } catch (error) {
       console.error('Error processing auth token:', error);
@@ -200,12 +204,12 @@ class DataManager {
     try {
       const pairs = this.storeManager.getPairs();
       const unpaired = this.storeManager.getUnpairedVideos();
-      
+
       // Map all videos from pairs, adding pairId to each video
       const allVideos = [
         ...pairs.flatMap(p => [
-          {...p.video1, pairId: p.id}, 
-          {...p.video2, pairId: p.id}
+          { ...p.video1, pairId: p.id },
+          { ...p.video2, pairId: p.id }
         ]).map(video => ({
           ...video,
           status: videoIds.includes(video.id) ? 'processing' : video.status
@@ -234,28 +238,28 @@ class DataManager {
 
       // Group videos by pair for batch processing
       const videosToProcessGroupedByPair = this.groupVideosByPair(videosToProcess);
-      
+
       // Process each batch of videos
       for (const videos of Object.values(videosToProcessGroupedByPair)) {
         const results = await this.mediaProcessor.processBatch(
-          videos, 
+          videos,
           this.updateVideoState.bind(this)
         );
-        
+
         // Mark processed videos
         results.forEach(result => {
           result.status = 'processed';
         });
-        
+
         // Update pairs with processed video results
         updatedPairs = this.storeManager.getPairs().map(pair => ({
           ...pair,
           video1: results.find(r => r.id === pair.video1.id) || pair.video1,
           video2: results.find(r => r.id === pair.video2.id) || pair.video2
         }));
-        
+
         this.storeManager.updatePairs(updatedPairs);
-        
+
         // Notify renderer about the updates
         this.mainWindow.webContents.send('media-processed', results);
         this.notifyDataUpdated();
@@ -282,7 +286,7 @@ class DataManager {
       return acc;
     }, {});
   }
-  
+
   // Resume processing for videos that were in 'processing' state
   async resumeProcessingVideos() {
     try {
@@ -293,7 +297,7 @@ class DataManager {
       const videosToProcess = existingPairs
         .flatMap(p => [{ ...p.video1, pairId: p.id }, { ...p.video2, pairId: p.id }])
         .filter(video => video.status === 'processing');
-      
+
       if (videosToProcess.length === 0) return;
 
       const videoIds = videosToProcess.map(v => v.id);
@@ -302,7 +306,7 @@ class DataManager {
       console.error('Failed to resume processing videos:', err);
     }
   }
-  
+
   // Upload and optionally auto-match videos
   async uploadVideos(autoMatchVideos = false) {
     const result = await dialog.showOpenDialog({
@@ -360,7 +364,7 @@ class DataManager {
 
     return { pairs: updatedPairs, unpaired: remainingUnpaired };
   }
-  
+
   // Manually pair two videos
   pairVideos(video1Id: string, video2Id: string) {
     const unpaired = this.storeManager.getUnpairedVideos();
@@ -386,11 +390,11 @@ class DataManager {
     // Remove paired videos from unpaired list
     const updatedUnpaired = unpaired.filter(v => v.id !== video1Id && v.id !== video2Id);
     this.storeManager.updateUnpairedVideos(updatedUnpaired);
-    
+
     this.notifyDataUpdated();
     return { success: true, pair: newPair };
   }
-  
+
   // Unpair videos
   unpairVideos(pairId: string) {
     const pairs = this.storeManager.getPairs();
@@ -418,7 +422,7 @@ class DataManager {
     this.notifyDataUpdated();
     return { success: true };
   }
-  
+
   // Get all videos data
   getAllVideos() {
     return {
@@ -443,7 +447,7 @@ class WindowManager {
         webSecurity: false, // Disable web security to allow local resource loading
       },
     });
-    
+
     if (isDev) {
       mainWindow.loadURL('http://localhost:5173');
     } else {
@@ -457,11 +461,11 @@ class WindowManager {
 // IPC handler setup
 class IpcHandlerSetup {
   private dataManager: DataManager;
-  
+
   constructor(dataManager: DataManager) {
     this.dataManager = dataManager;
   }
-  
+
   setup() {
     ipcMain.handle('get-environment-variables', () => {
       return {
@@ -512,12 +516,12 @@ class Application {
   private dataManager: DataManager;
   private ipcHandlerSetup: IpcHandlerSetup;
   private mainWindow: BrowserWindow;
-  
+
   constructor() {
     this.storeManager = new StoreManager(ENV);
     this.windowManager = WindowManager;
   }
-  
+
   async start() {
     try {
       // Handle Squirrel startup for Windows
@@ -525,17 +529,17 @@ class Application {
 
       // Register protocol for deep linking
       this.registerProtocolHandler();
-      
+
       // Initialize application when Electron is ready
       app.whenReady().then(() => {
         this.mainWindow = this.windowManager.createWindow();
-        
+
         this.dataManager = new DataManager(this.storeManager, this.mainWindow);
         this.ipcHandlerSetup = new IpcHandlerSetup(this.dataManager);
-        
+
         // Set up IPC handlers
         this.ipcHandlerSetup.setup();
-        
+
         // Resume processing of any videos in 'processing' state
         this.dataManager.resumeProcessingVideos();
 
@@ -544,7 +548,7 @@ class Application {
         if (authData) {
           this.dataManager.notifyAuthUpdated();
         }
-        
+
         app.on('activate', () => {
           // On macOS it's common to re-create a window in the app when the
           // dock icon is clicked and there are no other windows open.
@@ -553,7 +557,7 @@ class Application {
           }
         });
       });
-      
+
       // Quit when all windows are closed, except on macOS
       app.on('window-all-closed', () => {
         if (process.platform !== 'darwin') {
@@ -571,7 +575,7 @@ class Application {
       process.exit(1);
     }
   }
-  
+
   private registerProtocolHandler() {
     if (process.defaultApp) {
       if (process.argv.length >= 2) {
@@ -586,7 +590,7 @@ class Application {
     // For Windows: handle protocol when app is already running
     if (process.platform === 'win32') {
       const gotTheLock = app.requestSingleInstanceLock();
-      
+
       if (!gotTheLock) {
         app.quit();
         return;
@@ -611,10 +615,14 @@ class Application {
   private handleDeepLink(url: string) {
     try {
       // Check if this is an auth deeplink
-      if (url.includes('robotics-contributors://auth=')) {
-        const token = url.split('auth=')[1];
-        if (token && this.dataManager) {
-          const success = this.dataManager.processAuthToken(token);
+      if (url.includes('robotics-contributors://auth')) {
+        // Parse URL to extract JWT and CSRF tokens
+        const urlObj = new URL(url);
+        const jwt = urlObj.searchParams.get('jwt');
+        const csrf = urlObj.searchParams.get('csrf');
+
+        if (jwt && csrf && this.dataManager) {
+          const success = this.dataManager.processAuthToken(jwt, csrf);
           console.log('Auth token processing:', success ? 'successful' : 'failed');
         }
       }
@@ -622,7 +630,7 @@ class Application {
       console.error('Error handling deeplink:', error);
     }
   }
-  
+
   private handleSquirrelStartup() {
     try {
       // Only relevant on Windows

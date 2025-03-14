@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { clearAuthData, storeAuthData } from '../utils/auth';
 
 export interface AuthData {
+  csrf: string;
   token: string;
   username: string;
   loggedIn: boolean;
@@ -31,6 +33,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const loadAuth = async () => {
       try {
         const authData = await window.electronAPI.getAuth();
+        console.log('authData: ', authData);
         setAuth(authData);
       } catch (error) {
         console.error('Failed to load auth data:', error);
@@ -43,6 +46,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     window.electronAPI.onAuthChanged((data) => {
       setAuth(data.auth);
+      if (data.auth) {
+        storeAuthData(data.auth);
+      } else {
+        clearAuthData();
+      }
     });
 
     // Cleanup
