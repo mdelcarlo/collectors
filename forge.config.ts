@@ -10,10 +10,11 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 const config: ForgeConfig = {
   packagerConfig: {
     asar: {
-      unpack: "*.{node,py}"  // Unpack native modules and Python files
+      unpack: "*.{node,py,so,dll,dylib}"  // Unpack native modules and Python files
     },
     extraResource: [
       "./python",  // Include Python scripts
+      "./venv",    // Include the virtual environment
       "./node_modules/electron-squirrel-startup",
       './dist'
     ],
