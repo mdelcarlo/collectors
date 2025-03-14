@@ -1,0 +1,6 @@
+pip
+opencv-python
+moviepy
+audalign
+pydub
+numpy
