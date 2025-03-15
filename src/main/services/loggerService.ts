@@ -45,7 +45,6 @@ export class Logger {
         data,
         timestamp: new Date().toISOString()
       }
-      console.log('Sending log to renderer:', logdata);
       this.mainWindow.webContents.send('log', logdata);
     } catch (error) {
       console.error('Failed to send log to renderer:', error);
