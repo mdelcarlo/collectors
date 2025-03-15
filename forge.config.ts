@@ -16,7 +16,8 @@ const config: ForgeConfig = {
       "./python",  // Include Python scripts
       "./venv",    // Include the virtual environment
       "./node_modules/electron-squirrel-startup",
-      './dist'
+      './dist',
+      "./ffmpeg", // Ensure ffmpeg binary is included
     ],
   },
   rebuildConfig: {},

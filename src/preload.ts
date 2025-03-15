@@ -30,9 +30,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('videos-updated', (_event, data) => callback(data)),
   onMediaProcessed: (callback: FunctionConstructor) =>
     ipcRenderer.on('media-processed', (_event, data) => callback(data)),
+  log: (callback: FunctionConstructor) => ipcRenderer.on('log', (_event, data) => callback(data)),
   onAuthChanged: (callback: FunctionConstructor) =>
     ipcRenderer.on('auth-changed', (_event, data) => callback(data)),
-  // Remove event listeners
   removeAllListeners: (channel: string) =>
     ipcRenderer.removeAllListeners(channel)
 });

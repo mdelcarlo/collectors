@@ -7,6 +7,7 @@ import { MetaGenerator } from './main/services/metaGenerator';
 import { MediaProcessor } from './main/services/mediaProcesor';
 import { VideoStatus } from './types';
 import jwt from 'jsonwebtoken';
+import { logger } from './main/services/loggerService';
 
 interface AuthData {
   token: string;
@@ -54,7 +55,7 @@ class StoreManager {
         auth: null
       }
     });
-    // this.clear(); // Clear store on startup
+    this.clear(); // Clear store on startup
   }
 
   clear() {
@@ -115,7 +116,7 @@ class DataManager {
   constructor(storeManager: StoreManager, mainWindow: BrowserWindow) {
     this.storeManager = storeManager;
     this.mainWindow = mainWindow;
-    this.metaGenerator = new MetaGenerator();
+    this.metaGenerator = new MetaGenerator(mainWindow);
     this.videoMatcher = new VideoMatcher();
     this.mediaProcessor = new MediaProcessor();
   }
@@ -313,6 +314,7 @@ class DataManager {
       properties: ['openFile', 'multiSelections'],
       filters: [{ name: 'Videos', extensions: ['mp4', 'avi', 'mov', 'mkv', 'insv'] }]
     });
+    logger.log('Uploading videos...', result);
 
     if (result.canceled || result.filePaths.length === 0) {
       return null;
@@ -338,10 +340,12 @@ class DataManager {
         };
       })
     );
+    logger.log('newVideos :', newVideos);
+
 
     // Generate metadata for new videos
     const videosWithMeta = await this.metaGenerator.generateBatch(newVideos);
-
+    logger.log('Videos with metadata:', videosWithMeta);
     if (!autoMatchVideos) {
       const remainingUnpaired = [...existingUnpaired, ...videosWithMeta];
       this.storeManager.updateUnpairedVideos(remainingUnpaired);
@@ -506,6 +510,11 @@ class IpcHandlerSetup {
     ipcMain.handle('logout', async () => {
       return this.dataManager.logout();
     });
+
+    // Log handler
+    ipcMain.on('log:message', (_, message) => {
+      logger.log(message);
+    });
   }
 }
 
@@ -533,6 +542,9 @@ class Application {
       // Initialize application when Electron is ready
       app.whenReady().then(() => {
         this.mainWindow = this.windowManager.createWindow();
+        
+        // Set the main window in logger before creating services
+        logger.setMainWindow(this.mainWindow);
 
         this.dataManager = new DataManager(this.storeManager, this.mainWindow);
         this.ipcHandlerSetup = new IpcHandlerSetup(this.dataManager);

@@ -3,20 +3,62 @@ import fs from "fs/promises";
 import { app } from "electron";
 import { Worker } from "worker_threads";
 import { Video } from "src/types";
+import { platform } from "os";
+import { logger } from "./loggerService";
 
 export class MediaProcessor {
   private outputDir: string;
   private thumbnailsDir: string;
   private audioDir: string;
   private pythonScriptsDir: string;
+  private pythonPath: string;
 
   constructor() {
     // Create output directories in app data directory
     this.outputDir = path.join(app.getPath("userData"), "media");
     this.thumbnailsDir = path.join(this.outputDir, "thumbnails");
     this.audioDir = path.join(this.outputDir, "audio");
-    this.pythonScriptsDir = path.join(app.getAppPath(), "python");
+    this.pythonScriptsDir = path.join(app.getAppPath(), 'python').replace('/app.asar', '');
+
+    // Determine the Python path based on the platform and whether we're in development or production
+    this.pythonPath = this.getPythonPath();
+
     this.ensureOutputDirsExist();
+  }
+
+  /**
+   * Gets the appropriate Python path for the current environment
+   */
+  private getPythonPath(): string {
+    const isDev = !app.isPackaged;
+    console.log('isDev: ', isDev);
+
+    if (isDev) {
+      // In development, use the system Python or local venv
+      return process.platform === 'darwin' ? 'python3.9' : 'python3';
+    }
+
+    // In production, use the bundled Python
+    let pythonExecutable = '';
+
+    if (process.platform === 'darwin') {
+      // For macOS, the path is inside the .app bundle
+      // app.getAppPath() typically returns /Applications/YourApp.app/Contents/Resources/app
+      // We need to go up to Contents and then to Resources/venv
+      const appDir = isDev ? path.dirname(path.dirname(app.getAppPath())) : path.dirname(app.getPath('exe')).split('/MacOS').join('');
+      pythonExecutable = path.join(appDir, 'Resources', 'venv', 'bin', 'python3.9');
+    } else if (process.platform === 'win32') {
+      // For Windows
+      const appDir = path.dirname(app.getAppPath()); // Go up to resources
+      pythonExecutable = path.join(appDir, 'venv', 'Scripts', 'python.exe');
+    } else {
+      // For Linux
+      const appDir = path.dirname(app.getAppPath()); // Go up to resources
+      pythonExecutable = path.join(appDir, 'venv', 'bin', 'python3');
+    }
+
+    logger.log(`Using Python executable: ${pythonExecutable}`);
+    return pythonExecutable;
   }
 
   private async ensureOutputDirsExist() {
@@ -39,6 +81,11 @@ export class MediaProcessor {
     videos: any[],
     updateVideo: (video: Video) => void,
   ): Promise<any[]> {
+    logger.log('this.outputDir', this.outputDir)
+    logger.log('this.thumbnailsDir', this.thumbnailsDir)
+    logger.log('this.audioDir', this.audioDir)
+    logger.log('this.pythonScriptsDir', this.pythonScriptsDir)
+
     return new Promise((resolve) => {
       // Create a worker for media processing
       const worker = new Worker(
@@ -59,7 +106,7 @@ export class MediaProcessor {
           return encodeURI(filename + extension);
         }
 
-        async function processVideo(video, audioDir, thumbnailsDir, pythonScriptsDir) {
+        async function processVideo(video, audioDir, thumbnailsDir, pythonScriptsDir, pythonPath) {
           try {
             const startTime = Date.now();
 
@@ -69,21 +116,30 @@ export class MediaProcessor {
             const outputWidth = 640
             const outputExtension = ".mp4"
 
+
+              parentPort.postMessage({ type: 'log', message: 'before output filename' });
+
             const outputFilename = generateSampleVideoFilename(video.path, outputFps, outputWidth, outputExtension);
+              parentPort.postMessage({ type: 'log', message: 'after output filename: ' + outputFilename });
 
             try {
-              const pythonScript = path.join(pythonScriptsDir, 'create_sample_video.py');
-              const command = \`python "\${pythonScript}" -i '\${video.path}' -o "\${outputPath}" -f \${outputFps} -w \${outputWidth} -p auto-cv2 --output-filename "\${outputFilename}"\`;
-              console.log('Creating sample video...');
+              const pythonScript = pythonScriptsDir +  '/create_sample_video.py'
+              const command = \`\${pythonPath} "\${pythonScript}" -i '\${video.path}' -o "\${outputPath}" -f \${outputFps} -w \${outputWidth} -p auto-cv2 --output-filename "\${outputFilename}"\`;
+              console.log('Executing command:', command);
               const { stdout, stderr } = await execAsync(command);
+                  parentPort.postMessage({ type: 'log', message: stdout });
               
               if (stderr) {
                   console.error('Python stderr:', stderr);
+                  parentPort.postMessage({ type: 'log', message: stderr });
+
               }
               
               console.log('Sample video created:', stdout);
             } catch (error) {
               console.error('Error creating sample video:', error);
+                  parentPort.postMessage({ type: 'log', message: error });
+
               throw error;
             }
 
@@ -104,7 +160,7 @@ export class MediaProcessor {
         }
 
         async function processBatch() {
-          const { videos, audioDir, thumbnailsDir, pythonScriptsDir } = workerData;
+          const { videos, audioDir, thumbnailsDir, pythonScriptsDir, pythonPath } = workerData;
           const results = [];
           
           for (const video of videos) {
@@ -112,7 +168,7 @@ export class MediaProcessor {
               const startTime = Date.now();
               video.startProcessingTime = startTime
               parentPort.postMessage({ type: 'init', video });
-              const processedVideo = await processVideo(video, audioDir, thumbnailsDir, pythonScriptsDir);
+              const processedVideo = await processVideo(video, audioDir, thumbnailsDir, pythonScriptsDir, pythonPath);
               results.push(processedVideo);
               parentPort.postMessage({ type: 'progress', video: processedVideo });
             } catch (error) {
@@ -137,6 +193,7 @@ export class MediaProcessor {
             audioDir: this.audioDir,
             thumbnailsDir: this.thumbnailsDir,
             pythonScriptsDir: this.pythonScriptsDir,
+            pythonPath: this.pythonPath,  // Pass the Python path to the worker
           },
         },
       );
@@ -144,7 +201,9 @@ export class MediaProcessor {
       const results: any[] = [];
 
       worker.on("message", (message) => {
-        if (message.type === "init") {
+        if (message.type === "log") {
+          logger.log(message.message);
+        } else if (message.type === "init") {
           updateVideo(message.video);
         } else if (message.type === "error") {
           message.video.error = "Error while processing video";

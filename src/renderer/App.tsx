@@ -143,9 +143,16 @@ const App: React.FC = () => {
       );
     });
 
+    window.electronAPI.log((logData) => {
+      console.log('logData: ', logData);
+      const { level, message, data, timestamp } = logData;
+      console.log(`[${timestamp}] [${level}]`, message, data || '');
+    });
+
     // Cleanup listeners on unmount
     return () => {
       window.electronAPI.removeAllListeners('videos-updated');
+      
     };
   }, []);
 

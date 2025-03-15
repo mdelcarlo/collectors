@@ -23,6 +23,7 @@ declare global {
             logout: () => Promise<any>;
             getAuth: () => Promise<AuthData | null>;
             getEnvironmentVariables: () => Promise<any>;
+            log: (callback: (data: any) => void) => void;
         };
     }
 

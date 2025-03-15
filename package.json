@@ -8,6 +8,7 @@
     "start": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
+    "premake": "rm -rf out",
     "postmake": "node scripts/bundle-python.js",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx ."

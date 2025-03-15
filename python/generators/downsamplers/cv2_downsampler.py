@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 import concurrent.futures
 import shutil
+from pathlib import Path
 from generators.downsamplers.base import BaseVideoDownsampler
 from utils.ENUMS import DEFAULT_OUTPUT_FPS, DEFAULT_OUTPUT_WIDTH
 
@@ -155,8 +156,15 @@ class CV2Downsampler(BaseVideoDownsampler):
             
             # Extract audio from original file (OpenCV can't handle audio)
             temp_audio = os.path.join(temp_dir, "audio.aac")
+            ffmpeg_path = Path("/Users/matias.del/projects/robotics-contributors/out/robotics-contributors-darwin-arm64/robotics-contributors.app/Contents/Resources/ffmpeg")
+            if not ffmpeg_path.exists():
+                raise FileNotFoundError(f"FFmpeg binary not found at {ffmpeg_path}")
+
+            if not os.access(ffmpeg_path, os.X_OK):
+                raise PermissionError(f"FFmpeg is not executable: {ffmpeg_path}")
+
             audio_cmd = [
-                'ffmpeg',
+                str(ffmpeg_path),
                 '-i', input_file,
                 '-vn',                   # No video
                 '-acodec', 'copy',       # Copy audio codec 
@@ -173,8 +181,16 @@ class CV2Downsampler(BaseVideoDownsampler):
             # Merge video and audio (if audio exists)
             if has_audio:
                 print("Merging audio and video...")
+                ffmpeg_path = Path("/Users/matias.del/projects/robotics-contributors/out/robotics-contributors-darwin-arm64/robotics-contributors.app/Contents/Resources/ffmpeg")
+                print(ffmpeg_path)
+                if not ffmpeg_path.exists():
+                    raise FileNotFoundError(f"FFmpeg binary not found at {ffmpeg_path}")
+
+                if not os.access(ffmpeg_path, os.X_OK):
+                    raise PermissionError(f"FFmpeg is not executable: {ffmpeg_path}")
+
                 merge_cmd = [
-                    'ffmpeg',
+                    str(ffmpeg_path),
                     '-i', temp_video_path,    # Video file
                     '-i', temp_audio,         # Audio file
                     '-c:v', 'copy',           # Copy video

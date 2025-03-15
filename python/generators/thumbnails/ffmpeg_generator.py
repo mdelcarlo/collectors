@@ -44,7 +44,7 @@ class FFmpegThumbnailGenerator(BaseThumbnailGenerator):
         
         # Create a smaller, pre-scaled video file for faster processing
         cmd = [
-            'ffmpeg',
+            str(ffmpeg_path),
             '-i', video_path,
             '-vf', f'scale={self.target_width}:-1',  # Pre-scale to target width
             '-c:v', 'libx264',
@@ -78,7 +78,7 @@ class FFmpegThumbnailGenerator(BaseThumbnailGenerator):
         try:
             # Extract single frame at timestamp
             cmd = [
-                'ffmpeg',
+                str(ffmpeg_path),
                 '-ss', str(timestamp),
                 '-i', temp_video,  # Use the pre-scaled temporary video!
                 '-vframes', '1',

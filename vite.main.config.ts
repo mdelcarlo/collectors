@@ -33,7 +33,7 @@ export default defineConfig({
   // Define constants for builds
   define: {
     'process.env.FLUENTFFMPEG_COV': false,
-    // 'process.env.PUBLIC_SCALE_URL': JSON.stringify('https://remotasks.com')
-    'process.env.PUBLIC_SCALE_URL': JSON.stringify('http://localhost:3002')
+    'process.env.PUBLIC_SCALE_URL': JSON.stringify('https://remotasks.com')
+    // 'process.env.PUBLIC_SCALE_URL': JSON.stringify('http://localhost:3002')
   }
 });

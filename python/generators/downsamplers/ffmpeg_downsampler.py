@@ -23,7 +23,7 @@ class FFmpegDownsampler(BaseVideoDownsampler):
 
         # FFmpeg command to resize and downsample
         cmd = [
-            'ffmpeg',
+            str(ffmpeg_path),
             '-y',                         # Overwrite output file if it exists
             '-i', input_file,
             '-vf', f'fps={output_fps},scale={output_width}:-1',  # 1fps, width=320, height maintains aspect ratio
