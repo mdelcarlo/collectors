@@ -17,7 +17,10 @@ const config: ForgeConfig = {
       "./venv",    // Include the virtual environment
       "./node_modules/electron-squirrel-startup",
       './dist',
-      "./ffmpeg", // Ensure ffmpeg binary is included
+      // Make sure ffmpeg is bundled correctly for each platform
+      ...(process.platform === 'win32' ? ["./ffmpeg/ffmpeg.exe"] :
+        process.platform === 'darwin' ? ["./ffmpeg/ffmpeg-mac"] :
+          ["./ffmpeg/ffmpeg-linux"])
     ],
   },
   rebuildConfig: {},

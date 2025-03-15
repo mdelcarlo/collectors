@@ -41,19 +41,31 @@ export class MediaProcessor {
     // In production, use the bundled Python
     let pythonExecutable = '';
 
+    // Get the application directory based on platform
+    let appDir: string;
+    
     if (process.platform === 'darwin') {
       // For macOS, the path is inside the .app bundle
-      // app.getAppPath() typically returns /Applications/YourApp.app/Contents/Resources/app
-      // We need to go up to Contents and then to Resources/venv
-      const appDir = isDev ? path.dirname(path.dirname(app.getAppPath())) : path.dirname(app.getPath('exe')).split('/MacOS').join('');
+      if (isDev) {
+        // In dev mode, go up two levels from app.getAppPath()
+        appDir = path.dirname(path.dirname(app.getAppPath()));
+      } else {
+        // In production, get the executable path and navigate to Contents
+        // Example: /Applications/YourApp.app/Contents/MacOS/YourApp -> /Applications/YourApp.app/Contents
+        appDir = path.dirname(app.getPath('exe')).replace(/\/MacOS$/, '');
+      }
       pythonExecutable = path.join(appDir, 'Resources', 'venv', 'bin', 'python3.9');
     } else if (process.platform === 'win32') {
-      // For Windows
-      const appDir = path.dirname(app.getAppPath()); // Go up to resources
+      // For Windows, navigate from executable to resources directory
+      appDir = isDev 
+        ? path.dirname(app.getAppPath())  // Dev mode
+        : path.join(path.dirname(app.getPath('exe')), 'resources');  // Production
       pythonExecutable = path.join(appDir, 'venv', 'Scripts', 'python.exe');
     } else {
       // For Linux
-      const appDir = path.dirname(app.getAppPath()); // Go up to resources
+      appDir = isDev
+        ? path.dirname(app.getAppPath())  // Dev mode
+        : path.join(path.dirname(app.getPath('exe')), 'resources');  // Production
       pythonExecutable = path.join(appDir, 'venv', 'bin', 'python3');
     }
 
