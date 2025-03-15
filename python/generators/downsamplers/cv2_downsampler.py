@@ -8,6 +8,7 @@ import shutil
 from pathlib import Path
 from generators.downsamplers.base import BaseVideoDownsampler
 from utils.ENUMS import DEFAULT_OUTPUT_FPS, DEFAULT_OUTPUT_WIDTH
+from utils.ffmpeg_utils import get_ffmpeg_path
 
 class CV2Downsampler(BaseVideoDownsampler):
     # This function needs to be at the module level (not nested) for multiprocessing
@@ -60,7 +61,7 @@ class CV2Downsampler(BaseVideoDownsampler):
         - Efficient frame skipping
         """
         if not os.path.exists(input_file):
-            print(f"Error: Input file '{input_file}' does not exist")
+            print(f"❌ Error: Input file '{input_file}' does not exist")
             return {"error": "Input file does not exist"}
 
         start_time = time.time()
@@ -72,15 +73,18 @@ class CV2Downsampler(BaseVideoDownsampler):
         temp_video_path = os.path.join(temp_dir, "temp_video.mp4")
         
         try:
+            print(f"🎬 Starting video processing: {Path(input_file).name}")
             # Check if CUDA is available for GPU acceleration
             use_cuda = cv2.cuda.getCudaEnabledDeviceCount() > 0
             if use_cuda:
-                print("CUDA acceleration enabled")
+                print("🚀 CUDA acceleration enabled!")
+            else:
+                print("💻 Using CPU processing")
             
             # Get video properties
             cap = cv2.VideoCapture(input_file)
             if not cap.isOpened():
-                raise ValueError(f"Could not open video file {input_file}")
+                raise ValueError(f"❌ Could not open video file {input_file}")
                 
             orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -90,8 +94,8 @@ class CV2Downsampler(BaseVideoDownsampler):
             # Calculate new dimensions
             new_height = int(output_width * orig_height / orig_width)
             
-            print(f"Input video: {orig_width}x{orig_height} @ {orig_fps:.2f} FPS, {total_frames} frames")
-            print(f"Output video: {output_width}x{new_height} @ {output_fps} FPS")
+            print(f"📊 Input video: {orig_width}x{orig_height} @ {orig_fps:.2f} FPS, {total_frames} frames")
+            print(f"🔄 Output video: {output_width}x{new_height} @ {output_fps} FPS")
             
             # Calculate frame indices to keep based on output FPS
             frame_indices = []
@@ -104,7 +108,7 @@ class CV2Downsampler(BaseVideoDownsampler):
                 frame_indices = [int(i * step) for i in range(int(total_frames / step))]
             
             expected_output_frames = len(frame_indices)
-            print(f"Will extract {expected_output_frames} frames")
+            print(f"🖼️  Will extract {expected_output_frames} frames")
             
             # Set up video writer
             fourcc = cv2.VideoWriter_fourcc(*'avc1')  # H.264 codec
@@ -113,6 +117,7 @@ class CV2Downsampler(BaseVideoDownsampler):
             # Divide frames into chunks for parallel processing
             chunks = [frame_indices[i:i+chunk_size] for i in range(0, len(frame_indices), chunk_size)]
             
+            print(f"⚙️  Initializing processing with {max_workers or 'auto'} workers")
             # Process chunks in parallel
             with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
                 # Create a list of futures
@@ -131,6 +136,7 @@ class CV2Downsampler(BaseVideoDownsampler):
                 # Track progress
                 completed = 0
                 total_chunks = len(chunks)
+                print(f"🧩 Total chunks to process: {total_chunks}")
                 
                 # Process results as they complete
                 for future in concurrent.futures.as_completed(futures):
@@ -143,12 +149,21 @@ class CV2Downsampler(BaseVideoDownsampler):
                         # Update progress
                         completed += 1
                         progress = (completed / total_chunks) * 100
-                        print(f"\rProgress: {completed}/{total_chunks} chunks ({progress:.1f}%)", end="")
+                        
+                        # Create progress bar with emojis
+                        bar_length = 20
+                        filled_length = int(bar_length * completed // total_chunks)
+                        bar = '▓' * filled_length + '░' * (bar_length - filled_length)
+                        
+                        # Add emojis based on progress
+                        emoji = "🐢" if progress < 25 else "🚶" if progress < 50 else "🏃" if progress < 75 else "🚀"
+                        
+                        print(f"\r{emoji} Progress: [{bar}] {completed}/{total_chunks} chunks ({progress:.1f}%) ", end="")
                         
                     except Exception as e:
-                        print(f"\nError processing chunk: {e}")
+                        print(f"\n❌ Error processing chunk: {e}")
             
-            print("\nFrame processing complete")
+            print("\n✅ Frame processing complete!")
             
             # Release video writer
             out.release()
@@ -156,13 +171,14 @@ class CV2Downsampler(BaseVideoDownsampler):
             
             # Extract audio from original file (OpenCV can't handle audio)
             temp_audio = os.path.join(temp_dir, "audio.aac")
-            ffmpeg_path = Path("/Users/matias.del/projects/robotics-contributors/out/robotics-contributors-darwin-arm64/robotics-contributors.app/Contents/Resources/ffmpeg")
+            ffmpeg_path = get_ffmpeg_path()
             if not ffmpeg_path.exists():
-                raise FileNotFoundError(f"FFmpeg binary not found at {ffmpeg_path}")
+                raise FileNotFoundError(f"❌ FFmpeg binary not found at {ffmpeg_path}")
 
             if not os.access(ffmpeg_path, os.X_OK):
-                raise PermissionError(f"FFmpeg is not executable: {ffmpeg_path}")
+                raise PermissionError(f"❌ FFmpeg is not executable: {ffmpeg_path}")
 
+            print("🔊 Extracting audio...")
             audio_cmd = [
                 str(ffmpeg_path),
                 '-i', input_file,
@@ -172,7 +188,6 @@ class CV2Downsampler(BaseVideoDownsampler):
                 temp_audio
             ]
             
-            print("Extracting audio...")
             subprocess.run(audio_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             
             # Check if audio extraction succeeded
@@ -180,15 +195,7 @@ class CV2Downsampler(BaseVideoDownsampler):
             
             # Merge video and audio (if audio exists)
             if has_audio:
-                print("Merging audio and video...")
-                ffmpeg_path = Path("/Users/matias.del/projects/robotics-contributors/out/robotics-contributors-darwin-arm64/robotics-contributors.app/Contents/Resources/ffmpeg")
-                print(ffmpeg_path)
-                if not ffmpeg_path.exists():
-                    raise FileNotFoundError(f"FFmpeg binary not found at {ffmpeg_path}")
-
-                if not os.access(ffmpeg_path, os.X_OK):
-                    raise PermissionError(f"FFmpeg is not executable: {ffmpeg_path}")
-
+                print("🔄 Merging audio and video...")
                 merge_cmd = [
                     str(ffmpeg_path),
                     '-i', temp_video_path,    # Video file
@@ -203,23 +210,41 @@ class CV2Downsampler(BaseVideoDownsampler):
                 subprocess.run(merge_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             else:
                 # Just copy the video if no audio
-                print("No audio stream found, creating video-only output...")
+                print("ℹ️ No audio stream found, creating video-only output...")
                 shutil.copy(temp_video_path, output_path)
             
-            elapsed_time = (time.time() - start_time) * 1000  # in ms
-            print(f"Processing complete! Output saved to: {output_path}")
-            print(f"Total processing time: {elapsed_time:.2f} ms")
-
+            elapsed_time = (time.time() - start_time)
+            
+            # Format time nicely
+            if elapsed_time < 60:
+                time_str = f"{elapsed_time:.2f} seconds"
+            else:
+                minutes = int(elapsed_time // 60)
+                seconds = elapsed_time % 60
+                time_str = f"{minutes} min {seconds:.2f} sec"
+            
+            print(f"✨ Processing complete! Output saved to: {output_path}")
+            print(f"⏱️  Total processing time: {time_str}")
+            
+            # Add file size info
+            output_size_mb = os.path.getsize(output_path) / (1024 * 1024)
+            if os.path.exists(input_file):
+                input_size_mb = os.path.getsize(input_file) / (1024 * 1024)
+                compression_ratio = input_size_mb / output_size_mb if output_size_mb > 0 else 0
+                print(f"📦 File size: {output_size_mb:.2f} MB (Compression ratio: {compression_ratio:.2f}x)")
+            else:
+                print(f"📦 Output file size: {output_size_mb:.2f} MB")
 
             return output_path
             
         except Exception as e:
-            print(f"Error processing video: {str(e)}")
+            print(f"❌ Error processing video: {str(e)}")
             return {"error": str(e)}
             
         finally:
             # Clean up temporary files
             try:
+                print("🧹 Cleaning up temporary files...")
                 shutil.rmtree(temp_dir)
-            except:
-                pass
+            except Exception as e:
+                print(f"⚠️ Warning: Could not clean up temp files: {str(e)}")

@@ -12,7 +12,7 @@ export class MetaGenerator {
   constructor(mainWindow: BrowserWindow) {
     // Create thumbnails folder in app data directory
     this.outputDir = path.join(app.getPath('userData'), 'thumbnails');
-    this.pythonScriptsDir = path.join(app.getAppPath(), 'python').replace('/app.asar', '');
+    this.pythonScriptsDir = path.join(app.getAppPath().replace('app.asar', ''), 'python');
 
     // Set the main window in the logger singleton
     logger.setMainWindow(mainWindow);
@@ -94,21 +94,13 @@ export class MetaGenerator {
                 type: 'log', 
                 message: 'before join'
               });
-            const pythonScript = pythonScriptsDir + '/extract_video_info.py'
+            const pythonScript = path.join(pythonScriptsDir, 'extract_video_info.py');
                            parentPort.postMessage({ 
                 type: 'log', 
                 message: 'pythonScript: ' +pythonScript,
               });
             const command = \`\${pythonPath} "\${pythonScript}" -i "\${video.path}"\`;
-            parentPort.postMessage({ 
-                type: 'log', 
-                message: 'before comand'
-              });
             const { stdout, stderr } = await execAsync(command);
-            parentPort.postMessage({ 
-                type: 'log', 
-                message: 'after command' + stdout
-              });
             
             if (stderr) {
             parentPort.postMessage({ 

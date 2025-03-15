@@ -18,7 +18,7 @@ export class MediaProcessor {
     this.outputDir = path.join(app.getPath("userData"), "media");
     this.thumbnailsDir = path.join(this.outputDir, "thumbnails");
     this.audioDir = path.join(this.outputDir, "audio");
-    this.pythonScriptsDir = path.join(app.getAppPath(), 'python').replace('/app.asar', '');
+    this.pythonScriptsDir = path.join(app.getAppPath().replace('app.asar', ''), 'python');
 
     // Determine the Python path based on the platform and whether we're in development or production
     this.pythonPath = this.getPythonPath();
@@ -117,14 +117,18 @@ export class MediaProcessor {
             const outputExtension = ".mp4"
 
 
-              parentPort.postMessage({ type: 'log', message: 'before output filename' });
+            parentPort.postMessage({ type: 'log', message: 'before output filename' });
 
             const outputFilename = generateSampleVideoFilename(video.path, outputFps, outputWidth, outputExtension);
-              parentPort.postMessage({ type: 'log', message: 'after output filename: ' + outputFilename });
+            parentPort.postMessage({ type: 'log', message: 'after output filename: ' + outputFilename });
 
             try {
-              const pythonScript = pythonScriptsDir +  '/create_sample_video.py'
-              const command = \`\${pythonPath} "\${pythonScript}" -i '\${video.path}' -o "\${outputPath}" -f \${outputFps} -w \${outputWidth} -p auto-cv2 --output-filename "\${outputFilename}"\`;
+              const pythonScript = path.join(pythonScriptsDir, '/create_sample_video.py')
+              const command = process.platform === 'win32' 
+                ? \`"\${pythonPath}" "\${pythonScript}" -i "\${video.path}" -o "\${outputPath}" -f \${outputFps} -w \${outputWidth} -p auto-cv2 --output-filename "\${outputFilename}"\`
+                : \`\${pythonPath} "\${pythonScript}" -i '\${video.path}' -o "\${outputPath}" -f \${outputFps} -w \${outputWidth} -p auto-cv2 --output-filename "\${outputFilename}"\`;
+
+
               console.log('Executing command:', command);
               const { stdout, stderr } = await execAsync(command);
                   parentPort.postMessage({ type: 'log', message: stdout });

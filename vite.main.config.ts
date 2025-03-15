@@ -21,12 +21,6 @@ export default defineConfig({
         'child_process',
         'worker_threads',
         'util',
-        'fluent-ffmpeg',
-        '@ffmpeg-installer/ffmpeg',
-        '@ffmpeg-installer/darwin-arm64',
-        '@ffmpeg-installer/darwin-x64',
-        '@ffmpeg-installer/linux-x64',
-        '@ffmpeg-installer/win32-x64'
       ]
     }
   },
