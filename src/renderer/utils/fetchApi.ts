@@ -12,7 +12,16 @@ export async function fetchApi(
       'Content-Type': 'application/json',
     };
     
-    const csrf = localStorage.getItem('csrf_token') || getCookie('_csrf') || '';
+    // Get CSRF token from multiple possible sources
+    const csrf = localStorage.getItem('csrf_token') || 
+                getCookie('_csrf') || 
+                getCookie('*csrf') || 
+                '';
+    
+    // Get JWT token from multiple possible sources
+    const jwt = localStorage.getItem('jwt_token') || getCookie('_jwt') || 
+               getCookie('*jwt') || 
+               '';
 
     const response = await fetch(`${baseUrl}${endpoint}`, {
       cache,
@@ -22,6 +31,7 @@ export async function fetchApi(
         ...mergedHeaders,
         'Content-Type': 'application/json',
         'x-csrf-token': csrf,
+        'Authorization': jwt ? `Bearer ${jwt}` : '',
       },
       credentials: 'include',
       ...config,
