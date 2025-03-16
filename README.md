@@ -317,6 +317,7 @@ For additional help:
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 👨‍💻 Author
+## 👨‍💻 Authors  
 
-**Matias Del Carlo**
+- **Matias Del Carlo** - [matias.del@scale.com](mailto:matias.del@scale.com)  
+- **Fran Espeche** - [fran.espeche@scale.com](mailto:fran.espeche@scale.com)  
