@@ -13,8 +13,6 @@ def build_executables(force_universal2=False):
                                  even though it may fail with non-universal Python
     """
     system = platform.system().lower()
-    os.environ['SDKROOT'] = '/Library/Developer/CommandLineTools/SDKs/MacOSX14.5.sdk'
-    os.environ['MACOSX_DEPLOYMENT_TARGET'] = '14.5'
     
     # Define scripts to be packaged
     scripts = [
@@ -92,6 +90,7 @@ def build_executables(force_universal2=False):
         
         # Add platform-specific options
         if system == "darwin":
+            os.environ['MACOSX_DEPLOYMENT_TARGET'] = '14.5'
             print(f"Setting MACOSX_DEPLOYMENT_TARGET to {os.environ['MACOSX_DEPLOYMENT_TARGET']}")
 
             # Check if we're using Homebrew Python on Apple Silicon
