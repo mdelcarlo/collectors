@@ -97,7 +97,7 @@ jobs:
         with:
           name: robotics-contributors-${{ matrix.os }}
           path: ./artifacts/
-          retention-days: 7
+          retention-days: 1  # Reduced from 7 days to 1 day
   
   # release:
   #   needs: build
