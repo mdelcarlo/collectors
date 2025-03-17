@@ -59,19 +59,38 @@ try {
   console.log(`Using Python command: ${pythonCmd}`);
   execSync(`${pythonCmd} -m venv "${venvDir}"`, { stdio: 'inherit' });
 
-  // Install dependencies
+  // Get path to Python executable in the virtual environment
+  const pythonExe = platform === 'win32' 
+    ? `"${venvDir}\\Scripts\\python"` 
+    : `"${venvDir}/bin/python"`;
+  
+  // Get path to pip in the virtual environment
   const pipCmd = platform === 'win32' 
     ? `"${venvDir}\\Scripts\\pip"` 
     : `"${venvDir}/bin/pip"`;
 
-  console.log(`Using pip command: ${pipCmd}`);
-  execSync(`${pipCmd} install --upgrade pip`, { stdio: 'inherit' });
+  // Upgrade pip the correct way for each platform
+  console.log('Upgrading pip...');
+  if (platform === 'win32') {
+    // On Windows, use Python to execute pip as a module
+    execSync(`${pythonExe} -m pip install --upgrade pip`, { stdio: 'inherit' });
+  } else {
+    // On other platforms, can use pip directly
+    execSync(`${pipCmd} install --upgrade pip`, { stdio: 'inherit' });
+  }
   
   // Install each dependency individually for better error handling
   for (const dep of dependencies) {
     try {
       console.log(`Installing ${dep}...`);
-      execSync(`${pipCmd} install ${dep}`, { stdio: 'inherit' });
+      // Skip pip as we've already upgraded it
+      if (dep.trim().toLowerCase() === 'pip') continue;
+      
+      if (platform === 'win32') {
+        execSync(`${pythonExe} -m pip install ${dep}`, { stdio: 'inherit' });
+      } else {
+        execSync(`${pipCmd} install ${dep}`, { stdio: 'inherit' });
+      }
     } catch (error) {
       console.warn(`Warning: Failed to install ${dep}: ${error.message}`);
     }
@@ -90,19 +109,15 @@ ${dependencies.map(dep => {
   const pkgName = dep.split('==')[0].split('>')[0].split('<')[0].trim();
   return `try:
     import ${pkgName.replace('-', '_')}
-    print(f"✓ {pkgName} imported successfully")
+    print(f"✓ ${pkgName} imported successfully")
 except ImportError as e:
-    print(f"✗ {pkgName} import failed: {e}")`;
+    print(f"✗ ${pkgName} import failed: {e}")`;
 }).join('\n')}
 `);
   
   console.log('Created test script at:', testScript);
   
   // Test the environment
-  const pythonExe = platform === 'win32' 
-    ? `"${venvDir}\\Scripts\\python"` 
-    : `"${venvDir}/bin/python"`;
-  
   try {
     console.log('Testing Python environment:');
     execSync(`${pythonExe} "${testScript}"`, { stdio: 'inherit' });

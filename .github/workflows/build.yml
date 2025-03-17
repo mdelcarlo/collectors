@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-latest, windows-latest]
+        platform: ${{ github.ref == 'refs/heads/feat/bundler' && fromJSON('["windows-latest"]') || fromJSON('["macos-latest", "ubuntu-latest", "windows-latest"]') }}
         include:
           - platform: macos-latest
             os: darwin
