@@ -278,8 +278,9 @@ class DataManager {
 
     const updatedPairs = pairs.map(pair => ({
       ...pair,
-      video1: pair.video1.id === video.id ? video : pair.video1,
-      video2: pair.video2.id === video.id ? video : pair.video2,
+      // we are merging the video object here because otherwise we might potentially lose some previous processed data.
+      video1: pair.video1.id === video.id ? _.merge(pair.video1, video) : pair.video1,
+      video2: pair.video2.id === video.id ? video : _.merge(pair.video2, video),
     }));
 
     this.storeManager.updatePairs(updatedPairs);
