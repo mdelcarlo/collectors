@@ -13,6 +13,8 @@ def build_executables(force_universal2=False):
                                  even though it may fail with non-universal Python
     """
     system = platform.system().lower()
+    os.environ['SDKROOT'] = '/Library/Developer/CommandLineTools/SDKs/MacOSX14.5.sdk'
+    os.environ['MACOSX_DEPLOYMENT_TARGET'] = '14.5'
     
     # Define scripts to be packaged
     scripts = [
@@ -79,10 +81,10 @@ def build_executables(force_universal2=False):
         # Command line options for PyInstaller
         cmd = [
             "pyinstaller",
-            "--onefile",  # Create a single executable
-            "--distpath", output_dir,  # Output directory
-            "--name", script_name,  # Name of the output executable
-            "--noconfirm",  # Don't ask for confirmation
+            "--onefile", 
+            "--distpath", output_dir, 
+            "--name", script_name, 
+            "--noconfirm", 
         ]
         
         # Add common hidden imports
@@ -90,8 +92,6 @@ def build_executables(force_universal2=False):
         
         # Add platform-specific options
         if system == "darwin":
-    # Set minimum macOS version (e.g., 10.15 for Catalina)
-            os.environ['MACOSX_DEPLOYMENT_TARGET'] = '10.15'
             print(f"Setting MACOSX_DEPLOYMENT_TARGET to {os.environ['MACOSX_DEPLOYMENT_TARGET']}")
 
             # Check if we're using Homebrew Python on Apple Silicon
