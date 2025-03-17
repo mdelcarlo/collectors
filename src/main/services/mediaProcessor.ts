@@ -1,14 +1,7 @@
-import path from "path";
-import fs from "fs/promises";
-import { app } from "electron";
-import { Worker } from "worker_threads";
-import { Video } from "src/types";
-import { platform } from "os";
-import { logger } from "./loggerService";
-import { AlignmentResult } from "src/types/processors";
 import path from 'path';
 import fs from 'fs/promises';
 import { app } from 'electron';
+import { logger } from './loggerService';
 import { Worker } from 'worker_threads';
 import { AlignmentResult } from 'src/types/processors';
 
@@ -21,9 +14,9 @@ export class MediaProcessor {
 
   constructor() {
     // Create output directories in app data directory
-    this.outputDir = path.join(app.getPath("userData"), "media");
-    this.thumbnailsDir = path.join(this.outputDir, "thumbnails");
-    this.audioDir = path.join(this.outputDir, "audio");
+    this.outputDir = path.join(app.getPath('userData'), 'media');
+    this.thumbnailsDir = path.join(this.outputDir, 'thumbnails');
+    this.audioDir = path.join(this.outputDir, 'audio');
     this.pythonScriptsDir = path.join(app.getAppPath().replace('app.asar', ''), 'python');
 
     logger.log('🚀 MediaProcessor initializing...');
@@ -54,7 +47,7 @@ export class MediaProcessor {
 
     // Get the application directory based on platform
     let appDir: string;
-    
+
     if (process.platform === 'darwin') {
       // For macOS, the path is inside the .app bundle
       if (isDev) {
@@ -69,16 +62,16 @@ export class MediaProcessor {
       logger.log(`🍏 macOS Python path: ${pythonExecutable}`);
     } else if (process.platform === 'win32') {
       // For Windows, navigate from executable to resources directory
-      appDir = isDev 
-        ? path.dirname(app.getAppPath())  // Dev mode
-        : path.join(path.dirname(app.getPath('exe')), 'resources');  // Production
+      appDir = isDev
+        ? path.dirname(app.getAppPath()) // Dev mode
+        : path.join(path.dirname(app.getPath('exe')), 'resources'); // Production
       pythonExecutable = path.join(appDir, 'venv', 'Scripts', 'python.exe');
       logger.log(`🪟 Windows Python path: ${pythonExecutable}`);
     } else {
       // For Linux
       appDir = isDev
-        ? path.dirname(app.getAppPath())  // Dev mode
-        : path.join(path.dirname(app.getPath('exe')), 'resources');  // Production
+        ? path.dirname(app.getAppPath()) // Dev mode
+        : path.join(path.dirname(app.getPath('exe')), 'resources'); // Production
       pythonExecutable = path.join(appDir, 'venv', 'bin', 'python3');
       logger.log(`🐧 Linux Python path: ${pythonExecutable}`);
     }
@@ -92,22 +85,22 @@ export class MediaProcessor {
       logger.log(`🔍 Checking output directories...`);
       await fs.access(this.outputDir);
       logger.log(`📁 Main output directory exists: ${this.outputDir}`);
-      
+
       await fs.access(this.thumbnailsDir);
       logger.log(`📸 Thumbnails directory exists: ${this.thumbnailsDir}`);
-      
+
       await fs.access(this.audioDir);
       logger.log(`🔊 Audio directory exists: ${this.audioDir}`);
     } catch (error) {
       logger.log(`📂 Creating output directories...`);
-      
+
       try {
         await fs.mkdir(this.outputDir, { recursive: true });
         logger.log(`✅ Created main output directory: ${this.outputDir}`);
-        
+
         await fs.mkdir(this.thumbnailsDir, { recursive: true });
         logger.log(`✅ Created thumbnails directory: ${this.thumbnailsDir}`);
-        
+
         await fs.mkdir(this.audioDir, { recursive: true });
         logger.log(`✅ Created audio directory: ${this.audioDir}`);
       } catch (createError) {
@@ -121,10 +114,7 @@ export class MediaProcessor {
    * Process videos to extract audio and generate thumbnails concurrently using worker threads
    * that call Python scripts with MoviePy and OpenCV
    */
-  async processBatch(
-    videos: any[],
-    updateVideo: (video: Video) => void,
-  ): Promise<any[]> {
+  async processBatch(videos: any[], onEvent: (type: string, data: any) => void): Promise<void> {
     logger.log(`🎬 Starting batch processing of ${videos.length} videos`);
     logger.log(`⚙️ Configuration:
       - Output directory: ${this.outputDir}
@@ -134,8 +124,6 @@ export class MediaProcessor {
       - Python path: ${this.pythonPath}
     `);
 
-    return new Promise((resolve) => {
-  async processBatch(videos: any[], onEvent: (type: string, data: any) => void): Promise<void> {
     return new Promise(resolve => {
       // Create a worker for media processing
       const worker = new Worker(
@@ -379,46 +367,36 @@ export class MediaProcessor {
             audioDir: this.audioDir,
             thumbnailsDir: this.thumbnailsDir,
             pythonScriptsDir: this.pythonScriptsDir,
-            pythonPath: this.pythonPath,  // Pass the Python path to the worker
+            pythonPath: this.pythonPath, // Pass the Python path to the worker
           },
         },
       );
 
-      const results: any[] = [];
       let processedCount = 0;
 
-      worker.on("message", (message) => {
-        if (message.type === "log") {
-          logger.log(message.message);
-        } else if (message.type === "init") {
-          logger.log(`🔄 Initializing processing for video: ${path.basename(message.video.path)}`);
-          updateVideo(message.video);
-        } else if (message.type === "error") {
-          logger.log(`❌ Error while processing video: ${path.basename(message.video.path)}`);
-          message.video.error = "Error while processing video";
-          message.video.status = "idle";
-          message.video.startProcessingTime = undefined;
-          updateVideo(message.video);
-        } else if (message.type === "progress") {
-          processedCount++;
-          results.push(message.video);
-          logger.log(`📊 Progress: ${processedCount}/${videos.length} videos processed (${Math.round(processedCount/videos.length*100)}%)`);
-          updateVideo(message.video);
-        } else if (message.type === "complete") {
-          logger.log(`✅ Media processing complete - ${results.length} videos processed successfully`);
-          resolve(results);
-      worker.on("message", (message) => {
+      worker.on('message', message => {
         switch (message.type) {
+          case 'log': {
+            logger.log(message.message);
+            break;
+          }
           case 'align-video-pair': {
             onEvent('align-video-pair', message.results as AlignmentResult);
             break;
           }
           case 'create-sample-video': {
+            processedCount++;
+            logger.log(
+              `📊 Progress: ${processedCount}/${videos.length} videos processed (${Math.round(
+                (processedCount / videos.length) * 100,
+              )}%)`,
+            );
             message.video.status = 'processed';
             onEvent('update-video', message.video);
             break;
           }
           case 'error': {
+            logger.log(`❌ Error while processing video: ${path.basename(message.video.path)}`);
             const video = message.video;
             video.error = message.error || 'Unknown error';
             video.status = 'idle';
@@ -427,10 +405,16 @@ export class MediaProcessor {
             break;
           }
           case 'complete': {
+            logger.log(
+              `✅ Media processing complete - ${processedCount} videos processed successfully`,
+            );
             resolve();
             break;
           }
           case 'init': {
+            logger.log(
+              `🔄 Initializing processing for video: ${path.basename(message.video.path)}`,
+            );
             onEvent('update-video', message.video);
             break;
           }
@@ -440,11 +424,11 @@ export class MediaProcessor {
         }
       });
 
-      worker.on("error", (err) => {
+      worker.on('error', err => {
         logger.log(`❌ Worker error: ${err.message}`);
-        logger.log(`⚠️ Resolving with partial results (${results.length} videos)`);
-        resolve(results);
-        console.error("Worker error:", err);
+        logger.log(`⚠️ Resolving with partial results (${processedCount} videos)`);
+        resolve();
+        console.error('Worker error:', err);
         resolve();
       });
 

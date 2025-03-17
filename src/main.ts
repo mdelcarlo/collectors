@@ -68,7 +68,7 @@ class StoreManager {
     });
   }
 
-  clearVideos() {
+  removeAllVideos() {
     this.store.set({
       pairs: [],
       unpairedVideos: [],
@@ -288,18 +288,20 @@ class DataManager {
 
       // Map all videos from pairs, adding pairId to each video
       const allVideos = [
-        ...pairs.flatMap(p => [
-          { ...p.video1, pairId: p.id },
-          { ...p.video2, pairId: p.id }
-        ]).map(video => ({
-          ...video,
-          status: videoIds.includes(video.id) ? 'processing' : video.status
-        })),
-        ...unpaired
+        ...pairs
+          .flatMap(p => [
+            { ...p.video1, pairId: p.id },
+            { ...p.video2, pairId: p.id },
+          ])
+          .map(video => ({
+            ...video,
+            status: videoIds.includes(video.id) ? 'processing' : video.status,
+          })),
+        ...unpaired,
       ];
 
       // Update status of videos that will be processed
-      let updatedPairs = pairs.map(pair => ({
+      const updatedPairs = pairs.map(pair => ({
         ...pair,
         video1: {
           ...pair.video1,
@@ -409,7 +411,6 @@ class DataManager {
     );
     logger.log('newVideos :', newVideos);
 
-
     // Generate metadata for new videos
     const videosWithMeta = await this.metaGenerator.generateBatch(newVideos);
     logger.log('Videos with metadata:', videosWithMeta);
@@ -503,6 +504,13 @@ class DataManager {
       extractedAudios: this.storeManager.get('extractedAudios'),
     };
   }
+
+  // Remove all videos data
+  removeAllVideos() {
+    this.storeManager.removeAllVideos();
+    this.notifyDataUpdated();
+    return true;
+  }
 }
 
 // Window manager
@@ -570,6 +578,11 @@ class IpcHandlerSetup {
       return this.dataManager.getAllVideos();
     });
 
+    // Remove all videos data
+    ipcMain.handle('remove-all-videos', async () => {
+      return this.dataManager.removeAllVideos();
+    });
+
     // Auth handlers
     ipcMain.handle('get-auth', async () => {
       return this.dataManager.getAuthData();
@@ -582,9 +595,6 @@ class IpcHandlerSetup {
     // Log handler
     ipcMain.on('log:message', (_, message) => {
       logger.log(message);
-    // Remove all videos data
-    ipcMain.handle('remove-all-videos', async () => {
-      return this.dataManager.removeAllVideos();
     });
   }
 }
@@ -613,7 +623,7 @@ class Application {
       // Initialize application when Electron is ready
       app.whenReady().then(() => {
         this.mainWindow = this.windowManager.createWindow();
-        
+
         // Set the main window in logger before creating services
         logger.setMainWindow(this.mainWindow);
 
@@ -732,3 +742,4 @@ class Application {
 
 // Start the application
 const application = new Application();
+export default application;
