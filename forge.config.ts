@@ -6,15 +6,26 @@ import { MakerRpm } from '@electron-forge/maker-rpm';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import path from 'path';
+import fs from 'fs';
+
+// Determine platform-specific paths
+const platform = process.platform;
+const pythonExecutablesPath = path.join(__dirname, 'packaged_python', platform);
+
+// Get list of Python executable resources to include
+const pythonExecutables = fs.existsSync(pythonExecutablesPath) 
+  ? fs.readdirSync(pythonExecutablesPath).map(file => path.join(pythonExecutablesPath, file))
+  : [];
 
 const config: ForgeConfig = {
   packagerConfig: {
     asar: {
-      unpack: "*.{node,py,so,dll,dylib}"  // Unpack native modules and Python files
+      unpack: "*.{node,py,so,dll,dylib,exe}"  // Unpack native modules and Python files
     },
     extraResource: [
-      "./python",  // Include Python scripts
-      "./venv",    // Include the virtual environment
+      "./python",  // Include Python scripts for reference/development
+      './packaged_python',  // Include packaged Python executables
       "./node_modules/electron-squirrel-startup",
       './dist',
       // Make sure ffmpeg is bundled correctly for each platform

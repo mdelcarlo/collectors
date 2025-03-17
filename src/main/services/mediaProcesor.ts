@@ -3,82 +3,62 @@ import fs from "fs/promises";
 import { app } from "electron";
 import { Worker } from "worker_threads";
 import { Video } from "src/types";
-import { platform } from "os";
 import { logger } from "./loggerService";
 
 export class MediaProcessor {
   private outputDir: string;
   private thumbnailsDir: string;
   private audioDir: string;
-  private pythonScriptsDir: string;
-  private pythonPath: string;
+  private pythonExecutablesDir: string;
 
   constructor() {
     // Create output directories in app data directory
     this.outputDir = path.join(app.getPath("userData"), "media");
     this.thumbnailsDir = path.join(this.outputDir, "thumbnails");
     this.audioDir = path.join(this.outputDir, "audio");
-    this.pythonScriptsDir = path.join(app.getAppPath().replace('app.asar', ''), 'python');
+    
+    // Get the path to the packaged Python executables
+    this.pythonExecutablesDir = this.getPythonExecutablesPath();
 
     logger.log('🚀 MediaProcessor initializing...');
-
-    // Determine the Python path based on the platform and whether we're in development or production
-    this.pythonPath = this.getPythonPath();
-
     this.ensureOutputDirsExist();
     logger.log('✅ MediaProcessor initialized successfully');
+    logger.log(`📂 Python executables directory: ${this.pythonExecutablesDir}`);
   }
 
   /**
-   * Gets the appropriate Python path for the current environment
+   * Gets the path to the packaged Python executables based on the platform
    */
-  private getPythonPath(): string {
+  private getPythonExecutablesPath(): string {
     const isDev = !app.isPackaged;
     logger.log(`🔧 Environment: ${isDev ? 'development' : 'production'}`);
 
     if (isDev) {
-      // In development, use the system Python or local venv
-      const pythonPath = process.platform === 'darwin' ? 'python3.9' : 'python3';
-      logger.log(`🐍 Using development Python: ${pythonPath}`);
-      return pythonPath;
+      // In development, use the local packaged executables
+      const devExecutablesPath = path.join(app.getAppPath(), 'packaged_python', process.platform);
+      logger.log(`🔍 Development executables path: ${devExecutablesPath}`);
+      return devExecutablesPath;
     }
 
-    // In production, use the bundled Python
-    let pythonExecutable = '';
-
-    // Get the application directory based on platform
-    let appDir: string;
+    // In production, the executables are in the resources directory
+    let executablesPath = '';
     
     if (process.platform === 'darwin') {
       // For macOS, the path is inside the .app bundle
-      if (isDev) {
-        // In dev mode, go up two levels from app.getAppPath()
-        appDir = path.dirname(path.dirname(app.getAppPath()));
-      } else {
-        // In production, get the executable path and navigate to Contents
-        // Example: /Applications/YourApp.app/Contents/MacOS/YourApp -> /Applications/YourApp.app/Contents
-        appDir = path.dirname(app.getPath('exe')).replace(/\/MacOS$/, '');
-      }
-      pythonExecutable = path.join(appDir, 'Resources', 'venv', 'bin', 'python3.9');
-      logger.log(`🍏 macOS Python path: ${pythonExecutable}`);
+      executablesPath = path.join(app.getAppPath().replace('app.asar', ''), 'packaged_python', 'darwin');
+      logger.log(`🍏 macOS executables path: ${executablesPath}`);
     } else if (process.platform === 'win32') {
-      // For Windows, navigate from executable to resources directory
-      appDir = isDev 
-        ? path.dirname(app.getAppPath())  // Dev mode
-        : path.join(path.dirname(app.getPath('exe')), 'resources');  // Production
-      pythonExecutable = path.join(appDir, 'venv', 'Scripts', 'python.exe');
-      logger.log(`🪟 Windows Python path: ${pythonExecutable}`);
+      // For Windows
+      executablesPath = path.join(app.getAppPath().replace('app.asar', ''), 'packaged_python', 'win32');
+      logger.log(`🪟 Windows executables path: ${executablesPath}`);
     } else {
       // For Linux
-      appDir = isDev
-        ? path.dirname(app.getAppPath())  // Dev mode
-        : path.join(path.dirname(app.getPath('exe')), 'resources');  // Production
-      pythonExecutable = path.join(appDir, 'venv', 'bin', 'python3');
-      logger.log(`🐧 Linux Python path: ${pythonExecutable}`);
+      executablesPath = path.join(app.getAppPath().replace('app.asar', ''), 'packaged_python', 'linux');
+      logger.log(`🐧 Linux executables path: ${executablesPath}`);
     }
 
-    logger.log(`✅ Using Python executable: ${pythonExecutable}`);
-    return pythonExecutable;
+    logger.log(`✅ Using executables path: ${executablesPath}`);
+    return executablesPath;
   }
 
   private async ensureOutputDirsExist() {
@@ -113,7 +93,7 @@ export class MediaProcessor {
 
   /**
    * Process videos to extract audio and generate thumbnails concurrently using worker threads
-   * that call Python scripts with MoviePy and OpenCV
+   * that call the packaged Python executables
    */
   async processBatch(
     videos: any[],
@@ -124,8 +104,7 @@ export class MediaProcessor {
       - Output directory: ${this.outputDir}
       - Thumbnails directory: ${this.thumbnailsDir}
       - Audio directory: ${this.audioDir}
-      - Python scripts directory: ${this.pythonScriptsDir}
-      - Python path: ${this.pythonPath}
+      - Python executables directory: ${this.pythonExecutablesDir}
     `);
 
     return new Promise((resolve) => {
@@ -137,6 +116,7 @@ export class MediaProcessor {
         const { exec } = require('child_process');
         const util = require('util');
         const execAsync = util.promisify(exec);
+        const fs = require('fs');
 
         parentPort.postMessage({ 
           type: 'log', 
@@ -153,7 +133,7 @@ export class MediaProcessor {
           return encodeURI(filename + extension);
         }
 
-        async function processVideo(video, audioDir, thumbnailsDir, pythonScriptsDir, pythonPath) {
+        async function processVideo(video, audioDir, thumbnailsDir, pythonExecutablesDir) {
           try {
             const startTime = Date.now();
             parentPort.postMessage({ 
@@ -163,9 +143,9 @@ export class MediaProcessor {
 
             const outputPath = path.join(audioDir);
             
-            const outputFps = 2
-            const outputWidth = 640
-            const outputExtension = ".mp4"
+            const outputFps = 2;
+            const outputWidth = 640;
+            const outputExtension = ".mp4";
 
             parentPort.postMessage({ 
               type: 'log', 
@@ -179,15 +159,28 @@ export class MediaProcessor {
             });
 
             try {
-              const pythonScript = path.join(pythonScriptsDir, '/create_sample_video.py')
+              // Get the path to the create_sample_video executable
+              let executableName = 'create_sample_video';
+              if (process.platform === 'win32') {
+                executableName += '.exe';
+              }
+              
+              const executablePath = path.join(pythonExecutablesDir, executableName);
+              
+              // Check if the executable exists
+              if (!fs.existsSync(executablePath)) {
+                throw new Error(\`Executable not found at: \${executablePath}\`);
+              }
+              
               parentPort.postMessage({ 
                 type: 'log', 
-                message: \`📜 Using Python script: \${pythonScript}\`
+                message: \`📜 Using executable: \${executablePath}\`
               });
               
+              // Build the command based on platform
               const command = process.platform === 'win32' 
-                ? \`"\${pythonPath}" "\${pythonScript}" -i "\${video.path}" -o "\${outputPath}" -f \${outputFps} -w \${outputWidth} -p auto-cv2 --output-filename "\${outputFilename}"\`
-                : \`\${pythonPath} "\${pythonScript}" -i '\${video.path}' -o "\${outputPath}" -f \${outputFps} -w \${outputWidth} -p auto-cv2 --output-filename "\${outputFilename}"\`;
+                ? \`"\${executablePath}" -i "\${video.path}" -o "\${outputPath}" -f \${outputFps} -w \${outputWidth} -p auto-ffmpeg --output-filename "\${outputFilename}"\`
+                : \`\${executablePath} -i "\${video.path}" -o "\${outputPath}" -f \${outputFps} -w \${outputWidth} -p auto-ffmpeg --output-filename "\${outputFilename}"\`;
 
               parentPort.postMessage({ 
                 type: 'log', 
@@ -199,14 +192,14 @@ export class MediaProcessor {
               if (stdout) {
                 parentPort.postMessage({ 
                   type: 'log', 
-                  message: \`📝 Python stdout: \${stdout}\`
+                  message: \`📝 Executable stdout: \${stdout}\`
                 });
               }
               
               if (stderr) {
                 parentPort.postMessage({ 
                   type: 'log', 
-                  message: \`⚠️ Python stderr: \${stderr}\`
+                  message: \`⚠️ Executable stderr: \${stderr}\`
                 });
               }
               
@@ -246,7 +239,7 @@ export class MediaProcessor {
         }
 
         async function processBatch() {
-          const { videos, audioDir, thumbnailsDir, pythonScriptsDir, pythonPath } = workerData;
+          const { videos, audioDir, thumbnailsDir, pythonExecutablesDir } = workerData;
           const results = [];
           
           parentPort.postMessage({ 
@@ -265,7 +258,7 @@ export class MediaProcessor {
                 message: \`🎬 Started processing video: \${path.basename(video.path)}\`
               });
               
-              const processedVideo = await processVideo(video, audioDir, thumbnailsDir, pythonScriptsDir, pythonPath);
+              const processedVideo = await processVideo(video, audioDir, thumbnailsDir, pythonExecutablesDir);
               results.push(processedVideo);
               
               parentPort.postMessage({ 
@@ -304,8 +297,7 @@ export class MediaProcessor {
             videos,
             audioDir: this.audioDir,
             thumbnailsDir: this.thumbnailsDir,
-            pythonScriptsDir: this.pythonScriptsDir,
-            pythonPath: this.pythonPath,  // Pass the Python path to the worker
+            pythonExecutablesDir: this.pythonExecutablesDir,
           },
         },
       );

@@ -78,7 +78,7 @@ def get_ffmpeg_path():
                 base_dir = current
             else:
                 # Standard approach - go up two levels from executable to Contents
-                base_dir = exe_path.parent.parent.parent / "Resources"
+                base_dir = exe_path.parent.parent.parent
                 
             ffmpeg_path = base_dir / "ffmpeg-mac"
             logger.info(f"🍎 macOS: Using bundled FFmpeg at {ffmpeg_path}")
