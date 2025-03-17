@@ -39,7 +39,7 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
-const ENV = process.env.NODE_ENV
+const ENV = process.env.NODE_ENV;
 const isDev = ENV === 'development';
 
 // Initialize store for persistent data
@@ -52,8 +52,8 @@ class StoreManager {
       defaults: {
         pairs: [],
         unpairedVideos: [],
-        auth: null
-      }
+        auth: null,
+      },
     });
     this.clear(); // Clear store on startup
   }
@@ -63,7 +63,7 @@ class StoreManager {
     this.store.set({
       pairs: [],
       unpairedVideos: [],
-      auth: null
+      auth: null,
     });
   }
 
@@ -125,13 +125,15 @@ class DataManager {
   notifyDataUpdated() {
     this.mainWindow.webContents.send('videos-updated', {
       pairs: this.storeManager.getPairs(),
-      unpairedVideos: this.storeManager.getUnpairedVideos()
+      unpairedVideos: this.storeManager.getUnpairedVideos(),
     });
   }
 
   // Notify the renderer process of auth changes
   notifyAuthUpdated() {
-    this.mainWindow.webContents.send('auth-changed', { auth: this.storeManager.getAuth() });
+    this.mainWindow.webContents.send('auth-changed', {
+      auth: this.storeManager.getAuth(),
+    });
   }
 
   // Process JWT token and extract user info
@@ -149,7 +151,8 @@ class DataManager {
 
       // Extract username or relevant info from token
       // Assuming the token has 'username' claim - adjust based on your JWT structure
-      const username = decoded.username || decoded.name || decoded.email || 'User';
+      const username =
+        decoded.username || decoded.name || decoded.email || 'User';
 
       // Store auth data
       this.storeManager.setAuth({
@@ -190,10 +193,10 @@ class DataManager {
     console.log('Updating video state:', video);
     const pairs = this.storeManager.getPairs();
 
-    const updatedPairs = pairs.map(pair => ({
+    const updatedPairs = pairs.map((pair) => ({
       ...pair,
       video1: pair.video1.id === video.id ? video : pair.video1,
-      video2: pair.video2.id === video.id ? video : pair.video2
+      video2: pair.video2.id === video.id ? video : pair.video2,
     }));
 
     this.storeManager.updatePairs(updatedPairs);
@@ -208,37 +211,44 @@ class DataManager {
 
       // Map all videos from pairs, adding pairId to each video
       const allVideos = [
-        ...pairs.flatMap(p => [
-          { ...p.video1, pairId: p.id },
-          { ...p.video2, pairId: p.id }
-        ]).map(video => ({
-          ...video,
-          status: videoIds.includes(video.id) ? 'processing' : video.status
-        })),
-        ...unpaired
+        ...pairs
+          .flatMap((p) => [
+            { ...p.video1, pairId: p.id },
+            { ...p.video2, pairId: p.id },
+          ])
+          .map((video) => ({
+            ...video,
+            status: videoIds.includes(video.id) ? 'processing' : video.status,
+          })),
+        ...unpaired,
       ];
 
       // Update status of videos that will be processed
-      let updatedPairs = pairs.map(pair => ({
+      let updatedPairs = pairs.map((pair) => ({
         ...pair,
         video1: {
           ...pair.video1,
-          ...videoIds.includes(pair.video1.id) ? { status: 'processing' } : {},
+          ...(videoIds.includes(pair.video1.id)
+            ? { status: 'processing' }
+            : {}),
         },
         video2: {
           ...pair.video2,
-          ...videoIds.includes(pair.video2.id) ? { status: 'processing' } : {},
-        }
+          ...(videoIds.includes(pair.video2.id)
+            ? { status: 'processing' }
+            : {}),
+        },
       }));
 
       this.storeManager.updatePairs(updatedPairs);
       this.notifyDataUpdated();
 
       // Filter to only process requested videos
-      const videosToProcess = allVideos.filter(v => videoIds.includes(v.id));
+      const videosToProcess = allVideos.filter((v) => videoIds.includes(v.id));
 
       // Group videos by pair for batch processing
-      const videosToProcessGroupedByPair = this.groupVideosByPair(videosToProcess);
+      const videosToProcessGroupedByPair =
+        this.groupVideosByPair(videosToProcess);
 
       // Process each batch of videos
       for (const videos of Object.values(videosToProcessGroupedByPair)) {
@@ -248,15 +258,15 @@ class DataManager {
         );
 
         // Mark processed videos
-        results.forEach(result => {
+        results.forEach((result) => {
           result.status = 'processed';
         });
 
         // Update pairs with processed video results
-        updatedPairs = this.storeManager.getPairs().map(pair => ({
+        updatedPairs = this.storeManager.getPairs().map((pair) => ({
           ...pair,
-          video1: results.find(r => r.id === pair.video1.id) || pair.video1,
-          video2: results.find(r => r.id === pair.video2.id) || pair.video2
+          video1: results.find((r) => r.id === pair.video1.id) || pair.video1,
+          video2: results.find((r) => r.id === pair.video2.id) || pair.video2,
         }));
 
         this.storeManager.updatePairs(updatedPairs);
@@ -271,7 +281,7 @@ class DataManager {
       console.error('Error processing media:', error);
       this.mainWindow.webContents.send('processing-error', {
         type: 'media',
-        error: error.message
+        error: error.message,
       });
       return false;
     }
@@ -296,12 +306,15 @@ class DataManager {
 
       // Find videos that were in processing state
       const videosToProcess = existingPairs
-        .flatMap(p => [{ ...p.video1, pairId: p.id }, { ...p.video2, pairId: p.id }])
-        .filter(video => video.status === 'processing');
+        .flatMap((p) => [
+          { ...p.video1, pairId: p.id },
+          { ...p.video2, pairId: p.id },
+        ])
+        .filter((video) => video.status === 'processing');
 
       if (videosToProcess.length === 0) return;
 
-      const videoIds = videosToProcess.map(v => v.id);
+      const videoIds = videosToProcess.map((v) => v.id);
       await this.processVideos(videoIds, true);
     } catch (err) {
       console.error('Failed to resume processing videos:', err);
@@ -312,7 +325,9 @@ class DataManager {
   async uploadVideos(autoMatchVideos = false) {
     const result = await dialog.showOpenDialog({
       properties: ['openFile', 'multiSelections'],
-      filters: [{ name: 'Videos', extensions: ['mp4', 'avi', 'mov', 'mkv', 'insv'] }]
+      filters: [
+        { name: 'Videos', extensions: ['mp4', 'avi', 'mov', 'mkv', 'insv'] },
+      ],
     });
     logger.log('Uploading videos...', result);
 
@@ -336,12 +351,11 @@ class DataManager {
           paired: false,
           pairId: null,
           size: stats.size,
-          status: 'idle' as VideoStatus
+          status: 'idle' as VideoStatus,
         };
       })
     );
     logger.log('newVideos :', newVideos);
-
 
     // Generate metadata for new videos
     const videosWithMeta = await this.metaGenerator.generateBatch(newVideos);
@@ -354,9 +368,11 @@ class DataManager {
     }
 
     // Try to match new videos with existing unpaired videos
-    const { pairs: newPairs, unpaired: remainingUnpaired } = await this.videoMatcher.matchVideos(
-      [...existingUnpaired, ...videosWithMeta]
-    );
+    const { pairs: newPairs, unpaired: remainingUnpaired } =
+      await this.videoMatcher.matchVideos([
+        ...existingUnpaired,
+        ...videosWithMeta,
+      ]);
 
     // Combine existing pairs with new pairs
     const updatedPairs = [...existingPairs, ...newPairs];
@@ -372,8 +388,8 @@ class DataManager {
   // Manually pair two videos
   pairVideos(video1Id: string, video2Id: string) {
     const unpaired = this.storeManager.getUnpairedVideos();
-    const video1 = unpaired.find(v => v.id === video1Id);
-    const video2 = unpaired.find(v => v.id === video2Id);
+    const video1 = unpaired.find((v) => v.id === video1Id);
+    const video2 = unpaired.find((v) => v.id === video2Id);
 
     if (!video1 || !video2) {
       return { success: false, error: 'Videos not found' };
@@ -392,7 +408,9 @@ class DataManager {
     this.storeManager.updatePairs([...pairs, newPair]);
 
     // Remove paired videos from unpaired list
-    const updatedUnpaired = unpaired.filter(v => v.id !== video1Id && v.id !== video2Id);
+    const updatedUnpaired = unpaired.filter(
+      (v) => v.id !== video1Id && v.id !== video2Id
+    );
     this.storeManager.updateUnpairedVideos(updatedUnpaired);
 
     this.notifyDataUpdated();
@@ -402,7 +420,7 @@ class DataManager {
   // Unpair videos
   unpairVideos(pairId: string) {
     const pairs = this.storeManager.getPairs();
-    const pairIndex = pairs.findIndex(p => p.id === pairId);
+    const pairIndex = pairs.findIndex((p) => p.id === pairId);
 
     if (pairIndex === -1) {
       return { success: false, error: 'Pair not found' };
@@ -420,7 +438,7 @@ class DataManager {
     this.storeManager.updateUnpairedVideos([
       ...unpaired,
       { ...pair.video1, paired: false, pairId: null },
-      { ...pair.video2, paired: false, pairId: null }
+      { ...pair.video2, paired: false, pairId: null },
     ]);
 
     this.notifyDataUpdated();
@@ -432,7 +450,7 @@ class DataManager {
     return {
       pairs: this.storeManager.getPairs(),
       unpairedVideos: this.storeManager.getUnpairedVideos(),
-      extractedAudios: this.storeManager.get('extractedAudios')
+      extractedAudios: this.storeManager.get('extractedAudios'),
     };
   }
 }
@@ -455,7 +473,9 @@ class WindowManager {
     if (isDev) {
       mainWindow.loadURL('http://localhost:5173');
     } else {
-      mainWindow.loadFile(path.join(__dirname, "../../../dist/renderer/index.html"));
+      mainWindow.loadFile(
+        path.join(__dirname, '../../../dist/renderer/index.html')
+      );
     }
 
     return mainWindow;
@@ -515,6 +535,17 @@ class IpcHandlerSetup {
     ipcMain.on('log:message', (_, message) => {
       logger.log(message);
     });
+
+    // Handle file read request
+    ipcMain.handle('read-file', async (_event, filePath) => {
+      try {
+        const buffer = await fs.readFile(filePath);
+        return buffer.toString('base64');
+      } catch (error) {
+        console.error('Error reading file:', error);
+        return null;
+      }
+    });
   }
 }
 
@@ -542,7 +573,7 @@ class Application {
       // Initialize application when Electron is ready
       app.whenReady().then(() => {
         this.mainWindow = this.windowManager.createWindow();
-        
+
         // Set the main window in logger before creating services
         logger.setMainWindow(this.mainWindow);
 
@@ -579,6 +610,7 @@ class Application {
 
       // Handle open-url events (deep linking)
       app.on('open-url', (event, url) => {
+        console.log('hello world open-url', url);
         event.preventDefault();
         this.handleDeepLink(url);
       });
@@ -591,9 +623,11 @@ class Application {
   private registerProtocolHandler() {
     if (process.defaultApp) {
       if (process.argv.length >= 2) {
-        app.setAsDefaultProtocolClient('robotics-contributors', process.execPath, [
-          path.resolve(process.argv[1])
-        ]);
+        app.setAsDefaultProtocolClient(
+          'robotics-contributors',
+          process.execPath,
+          [path.resolve(process.argv[1])]
+        );
       }
     } else {
       app.setAsDefaultProtocolClient('robotics-contributors');
@@ -616,7 +650,9 @@ class Application {
         }
 
         // Extract deeplink URL from second instance
-        const url = commandLine.find(arg => arg.startsWith('robotics-contributors://'));
+        const url = commandLine.find((arg) =>
+          arg.startsWith('robotics-contributors://')
+        );
         if (url) {
           this.handleDeepLink(url);
         }
@@ -625,17 +661,23 @@ class Application {
   }
 
   private handleDeepLink(url: string) {
+    console.log('hello world handleDeepLink');
     try {
       // Check if this is an auth deeplink
       if (url.includes('robotics-contributors://auth')) {
         // Parse URL to extract JWT and CSRF tokens
         const urlObj = new URL(url);
-        const jwt = urlObj.searchParams.get('jwt');
-        const csrf = urlObj.searchParams.get('csrf');
+        const jwt = urlObj.searchParams.get('auth');
+        const csrf = urlObj.searchParams.get('csrf') || 'test';
+
+        console.log('hello world', jwt);
 
         if (jwt && csrf && this.dataManager) {
           const success = this.dataManager.processAuthToken(jwt, csrf);
-          console.log('Auth token processing:', success ? 'successful' : 'failed');
+          console.log(
+            'Auth token processing:',
+            success ? 'successful' : 'failed'
+          );
         }
       }
     } catch (error) {
@@ -654,7 +696,10 @@ class Application {
         }
       }
     } catch (error) {
-      console.log('Squirrel startup check failed, likely not on Windows:', error.message);
+      console.log(
+        'Squirrel startup check failed, likely not on Windows:',
+        error.message
+      );
     }
   }
 }

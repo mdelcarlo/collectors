@@ -12,7 +12,6 @@ interface UploadPairModalProps {
   pair: { video1: Video; video2: Video };
 }
 
-
 const UploadPairModal: React.FC<UploadPairModalProps> = ({
   isOpen,
   onClose,
@@ -31,13 +30,7 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
   });
 
   // Use your custom upload hook
-  const {
-    upload,
-    isLoading,
-    isError,
-    isSuccess,
-    error,
-  } = useVideoUpload({
+  const { upload, isLoading, isError, isSuccess, error } = useVideoUpload({
     onSuccess: (data) => {
       console.log('Upload success:', data);
     },
@@ -48,7 +41,6 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
 
   // Offset value in milliseconds (from your processing results)
   const videoOffset = 5500; // 1.5 seconds offset (video2 starts 1.5s after video1)
-
   const handleSubmit = async () => {
     const payload = {
       form: {
@@ -63,18 +55,26 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
         {
           metadata: { name: video1.name, size: video1.size },
           content: video1.preview,
+          checksum: video1.checksum,
+          processingResults: {
+            offset: 0,
+          },
         },
         {
           metadata: { name: video2.name, size: video2.size },
           content: video2.preview,
+          checksum: video2.checksum,
+          processingResults: {
+            offset: videoOffset, // 1500 milliseconds
+          },
         },
       ],
       processingResults: {
         alignment: {
-          targetId: video2.id,
-          offset: videoOffset, // 1500 milliseconds
           confidence: 0,
-        }
+          elapsedTimeSeconds: 0,
+          overlap: 0,
+        },
       },
     };
 
@@ -89,10 +89,7 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div
-      
-      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-    >
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <motion.div
         className="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-w-3xl w-full"
         initial={{ opacity: 0, y: -20 }}
@@ -115,7 +112,6 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
           </div>
 
           <div className="overflow-y-auto mb-8" style={{ maxHeight: '80vh' }}>
-
             {/* Video Sync Visualizer Section */}
             {video1 && video2 && (
               <div className="mb-6">
@@ -124,13 +120,13 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
                     name: video1.name,
                     preview: video1.preview || '',
                     duration: video1.duration || 0,
-                    checksum: video1.checksum || 0,
+                    checksum: video1.checksum || '',
                   }}
                   video2={{
                     name: video2.name,
                     preview: video2.preview || '',
                     duration: video2.duration || 0,
-                    checksum: video2.checksum || 0,
+                    checksum: video2.checksum || '',
                   }}
                   offset={videoOffset}
                   showThumbnails={true}
@@ -193,7 +189,6 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
                 </label>
               </div>
             </div>
-
           </div>
 
           {/* Action buttons */}
@@ -209,9 +204,11 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
               disabled={!video1 || !video2 || !isSync || !isSufficientLighting}
               className={`
                 py-3 px-6 rounded-lg font-medium transition-colors
-                ${(!video1 || !video2 || !isSync || !isSufficientLighting)
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500'
-                  : 'bg-green-500 hover:bg-green-600 text-white'}
+                ${
+                  !video1 || !video2 || !isSync || !isSufficientLighting
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500'
+                    : 'bg-green-500 hover:bg-green-600 text-white'
+                }
               `}
             >
               Submit
@@ -221,7 +218,9 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
           {/* Optional: Display upload status */}
           {isLoading && <p className="mt-4 text-blue-500">Uploading...</p>}
           {isSuccess && <p className="mt-4 text-green-500">Upload complete!</p>}
-          {isError && <p className="mt-4 text-red-500">Upload failed: {error?.message}</p>}
+          {isError && (
+            <p className="mt-4 text-red-500">Upload failed: {error?.message}</p>
+          )}
         </div>
       </motion.div>
     </div>
