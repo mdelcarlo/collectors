@@ -36,8 +36,7 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({ isOpen, onClose, pair
   });
 
   // Offset value in milliseconds (from your processing results)
-  const videoOffset = 5500; // 1.5 seconds offset (video2 starts 1.5s after video1)
-  const handleSubmit = async () => {
+  const handleSubmit = async ({ overlap }: { overlap: number }) => {
     const payload = {
       form: {
         activity,
@@ -66,7 +65,7 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({ isOpen, onClose, pair
         alignment: {
           confidence: 0,
           elapsedTimeSeconds: 0,
-          overlap: 0,
+          overlap: overlap,
         },
       },
     };
@@ -78,6 +77,18 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({ isOpen, onClose, pair
       console.error('Error uploading pair:', err);
     }
   };
+
+  const offset = video1.offset || video2.offset;
+
+  // Calculate overlap
+  const overlapStartMs = Math.max(offset < 0 ? Math.abs(offset) : 0, offset > 0 ? offset : 0);
+  const overlapEndMs = Math.min(
+    (offset < 0 ? Math.abs(offset) : 0) + video1.duration * 1000,
+    (offset > 0 ? offset : 0) + video2.duration * 1000,
+  );
+
+  const hasOverlap = overlapEndMs > overlapStartMs;
+  const overlapTimeSeconds = hasOverlap ? (overlapEndMs - overlapStartMs) / 1000 : 0;
 
   if (!isOpen) return null;
 
@@ -121,7 +132,7 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({ isOpen, onClose, pair
                     duration: video2.duration || 0,
                     checksum: video2.checksum || '',
                   }}
-                  offset={video1.offset}
+                  offset={offset}
                   showThumbnails={true}
                 />
               </div>
@@ -187,8 +198,10 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({ isOpen, onClose, pair
               Cancel
             </button>
             <button
-              onClick={handleSubmit}
-              disabled={!video1 || !video2 || !isSync || !isSufficientLighting}
+              onClick={() => handleSubmit({ overlap: overlapTimeSeconds })}
+              disabled={
+                !video1 || !video2 || !isSync || !isSufficientLighting || overlapTimeSeconds < 30
+              }
               className={`
                 py-3 px-6 rounded-lg font-medium transition-colors
                 ${
@@ -201,6 +214,13 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({ isOpen, onClose, pair
               Submit
             </button>
           </div>
+
+          {isLoading && <p className="mt-4 text-blue-500">Uploading...</p>}
+          {overlapTimeSeconds < 30 && (
+            <p className="mt-4 text-red-500">
+              Videos must have at least 30 seconds of overlap to be uploaded
+            </p>
+          )}
 
           {/* Optional: Display upload status */}
           {isLoading && <p className="mt-4 text-blue-500">Uploading...</p>}
