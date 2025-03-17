@@ -1,3 +1,4 @@
+import _ from 'lodash';
 import { app, BrowserWindow, ipcMain, dialog, protocol } from 'electron';
 import path from 'path';
 import fs from 'fs/promises';
