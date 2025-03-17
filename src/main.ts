@@ -187,13 +187,19 @@ class DataManager {
             console.error('Pair not found for video:', data.target);
             return;
           }
-          const alignment = {
+          pair.alignment = {
             offset: data.offset,
             confidence: data.confidence,
             target: data.target,
             elapsedTimeSeconds: data.elapsed_time_seconds,
+            // shortest video duration - offset
+            overlap: Math.min(pair.video1.duration, pair.video2.duration) - data.offset / 1000,
           };
-          pair.alignment = alignment;
+
+          pair.video1.offset = data.target === pair.video2.id ? data.offset : 0;
+          pair.video2.offset = data.target === pair.video1.id ? data.offset : 0;
+
+          this.notifyDataUpdated();
           this.storeManager.updatePair(pair);
         },
       },
