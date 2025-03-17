@@ -742,4 +742,4 @@ class Application {
 
 // Start the application
 const application = new Application();
-export default application;
+application.start();
