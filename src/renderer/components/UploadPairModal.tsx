@@ -12,11 +12,7 @@ interface UploadPairModalProps {
   pair: { video1: Video; video2: Video };
 }
 
-const UploadPairModal: React.FC<UploadPairModalProps> = ({
-  isOpen,
-  onClose,
-  pair,
-}) => {
+const UploadPairModal: React.FC<UploadPairModalProps> = ({ isOpen, onClose, pair }) => {
   const [activity, setActivity] = useState('');
   const [environment, setEnvironment] = useState('');
   const [isSync, setIsSync] = useState(false);
@@ -31,10 +27,10 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
 
   // Use your custom upload hook
   const { upload, isLoading, isError, isSuccess, error } = useVideoUpload({
-    onSuccess: (data) => {
+    onSuccess: data => {
       console.log('Upload success:', data);
     },
-    onError: (err) => {
+    onError: err => {
       console.error('Upload error:', err);
     },
   });
@@ -47,17 +43,14 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
         activity,
         environment,
       },
-      checkList: [
-        isSync ? 'sync' : '',
-        isSufficientLighting ? 'lighting' : '',
-      ].filter(Boolean),
+      checkList: [isSync ? 'sync' : '', isSufficientLighting ? 'lighting' : ''].filter(Boolean),
       videos: [
         {
           metadata: { name: video1.name, size: video1.size },
           content: video1.preview,
           checksum: video1.checksum,
           processingResults: {
-            offset: 0,
+            offset: video1.offset,
           },
         },
         {
@@ -65,7 +58,7 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
           content: video2.preview,
           checksum: video2.checksum,
           processingResults: {
-            offset: videoOffset, // 1500 milliseconds
+            offset: video2.offset, // 1500 milliseconds
           },
         },
       ],
@@ -128,7 +121,7 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
                     duration: video2.duration || 0,
                     checksum: video2.checksum || '',
                   }}
-                  offset={videoOffset}
+                  offset={video1.offset}
                   showThumbnails={true}
                 />
               </div>
@@ -141,7 +134,7 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
                   type="text"
                   placeholder="Activity"
                   value={activity}
-                  onChange={(e) => setActivity(e.target.value)}
+                  onChange={e => setActivity(e.target.value)}
                   className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                 />
               </div>
@@ -150,7 +143,7 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
                   type="text"
                   placeholder="Environment"
                   value={environment}
-                  onChange={(e) => setEnvironment(e.target.value)}
+                  onChange={e => setEnvironment(e.target.value)}
                   className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                 />
               </div>
@@ -163,13 +156,10 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
                   type="checkbox"
                   id="syncCheck"
                   checked={isSync}
-                  onChange={(e) => setIsSync(e.target.checked)}
+                  onChange={e => setIsSync(e.target.checked)}
                   className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
-                <label
-                  htmlFor="syncCheck"
-                  className="ml-2 text-gray-700 dark:text-gray-300"
-                >
+                <label htmlFor="syncCheck" className="ml-2 text-gray-700 dark:text-gray-300">
                   I checked and both videos are sync
                 </label>
               </div>
@@ -178,13 +168,10 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
                   type="checkbox"
                   id="lightingCheck"
                   checked={isSufficientLighting}
-                  onChange={(e) => setIsSufficientLighting(e.target.checked)}
+                  onChange={e => setIsSufficientLighting(e.target.checked)}
                   className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
-                <label
-                  htmlFor="lightingCheck"
-                  className="ml-2 text-gray-700 dark:text-gray-300"
-                >
+                <label htmlFor="lightingCheck" className="ml-2 text-gray-700 dark:text-gray-300">
                   Sufficient lighting in the videos
                 </label>
               </div>
@@ -218,9 +205,7 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
           {/* Optional: Display upload status */}
           {isLoading && <p className="mt-4 text-blue-500">Uploading...</p>}
           {isSuccess && <p className="mt-4 text-green-500">Upload complete!</p>}
-          {isError && (
-            <p className="mt-4 text-red-500">Upload failed: {error?.message}</p>
-          )}
+          {isError && <p className="mt-4 text-red-500">Upload failed: {error?.message}</p>}
         </div>
       </motion.div>
     </div>
