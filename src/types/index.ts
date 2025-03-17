@@ -19,6 +19,7 @@ export interface Video {
   status: VideoStatus;
   error?: string;
   preview?: string;
+  offset?: number; // offset in ms
 }
 
 export interface Pair {
