@@ -18,6 +18,7 @@ declare global {
       processMedia: (videoIds: string[]) => Promise<any>;
       onVideosUpdated: (callback: (data: any) => void) => void;
       removeAllListeners: (channel: string) => void;
+      removeAllVideos: () => void;
       onMediaProcessed: (callback: (data: any) => void) => void;
       onAuthChanged: (callback: (data: { auth: AuthData }) => void) => void;
       logout: () => Promise<any>;

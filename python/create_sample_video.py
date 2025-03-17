@@ -121,7 +121,7 @@ def main(args):
             return generator.process(input_file=args.input, output_dir=args.output, output_filename=OUTPUT_FILENAME, output_width=args.width, output_fps=args.fps)
             
         else:
-            from utils.extract_audio import extract_audio
+            from utils.extract_audio import extract_audio_single
             from utils.generate_thumbnails import generate_thumbnails
             from utils.create_video_from_thumbs import create_video_from_thumbs
 
@@ -131,7 +131,7 @@ def main(args):
             # Extract audio
             audio_dir = os.path.join(TEMP_DIR, "audio")
             os.makedirs(audio_dir, exist_ok=True)
-            audio_results = extract_audio(args.input, audio_dir)
+            audio_results = extract_audio_single(args.input, audio_dir)
             print(f"Audio extraction completed successfully: {audio_results}")
             
             # Generate thumbnails

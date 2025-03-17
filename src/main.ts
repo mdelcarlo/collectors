@@ -1,10 +1,11 @@
+import _ from 'lodash';
 import { app, BrowserWindow, ipcMain, dialog, protocol } from 'electron';
 import path from 'path';
 import fs from 'fs/promises';
 import { VideoMatcher } from './main/services/videoMatcher';
 import Store from 'electron-store';
 import { MetaGenerator } from './main/services/metaGenerator';
-import { MediaProcessor } from './main/services/mediaProcesor';
+import { MediaProcessor } from './main/services/mediaProcessor';
 import { VideoStatus } from './types';
 import jwt from 'jsonwebtoken';
 import { logger } from './main/services/loggerService';
@@ -29,9 +30,10 @@ interface JwtPayload {
   iat?: number;
   exp?: number;
 }
+import { AlignmentResult } from './types/processors';
 
 // Error handling setup
-process.on('uncaughtException', (err) => {
+process.on('uncaughtException', err => {
   console.error('Uncaught Exception:', err);
 });
 
@@ -67,6 +69,13 @@ class StoreManager {
     });
   }
 
+  removeAllVideos() {
+    this.store.set({
+      pairs: [],
+      unpairedVideos: [],
+    });
+  }
+
   get(key: string): any {
     return this.store.get(key);
   }
@@ -75,12 +84,27 @@ class StoreManager {
     this.store.set(key, value);
   }
 
+  getPairByVideoId(videoId: string) {
+    return this.store.get('pairs').find(p => p.video1.id === videoId || p.video2.id === videoId);
+  }
+
   getPairs(): any[] {
     return this.store.get('pairs') as any[];
   }
 
   getUnpairedVideos(): any[] {
     return this.store.get('unpairedVideos') as any[];
+  }
+
+  updatePair(pair: any) {
+    const pairs = this.store.get('pairs') as any[];
+    const existing = pairs.find(p => p.id === pair.id);
+    if (!existing) {
+      console.error('Pair not found', pair);
+      throw new Error('Pair not found');
+    }
+    const updatedPairs = pairs.map(p => (p.id === pair.id ? pair : p));
+    this.store.set('pairs', updatedPairs);
   }
 
   updatePairs(pairs: any[]) {
@@ -105,6 +129,29 @@ class StoreManager {
   }
 }
 
+type ProcessType = 'update-video' | 'align-video-pair';
+type ProcessHandler = (data: any) => void;
+
+type Process = {
+  type: ProcessType;
+  handler: ProcessHandler;
+};
+
+class ProcessManager {
+  private processes: Process[] = [];
+
+  constructor(handlers: Process[]) {
+    this.processes.push(...handlers);
+  }
+
+  handleProcess(type: ProcessType, data: any) {
+    const process = this.processes.find(p => p.type === type);
+    if (process) {
+      process.handler(data);
+    }
+  }
+}
+
 // Application data manager
 class DataManager {
   private storeManager: StoreManager;
@@ -112,6 +159,7 @@ class DataManager {
   private metaGenerator: MetaGenerator;
   private videoMatcher: VideoMatcher;
   private mediaProcessor: MediaProcessor;
+  private processManager: ProcessManager;
 
   constructor(storeManager: StoreManager, mainWindow: BrowserWindow) {
     this.storeManager = storeManager;
@@ -119,6 +167,45 @@ class DataManager {
     this.metaGenerator = new MetaGenerator(mainWindow);
     this.videoMatcher = new VideoMatcher();
     this.mediaProcessor = new MediaProcessor();
+    this.processManager = new ProcessManager(this.getProcessHandlers());
+  }
+
+  private getProcessHandlers() {
+    const handlers = [
+      {
+        type: 'process-error',
+        handler: this.updateVideoState.bind(this),
+      },
+      {
+        type: 'update-video',
+        handler: this.updateVideoState.bind(this),
+      },
+      {
+        type: 'align-video-pair',
+        handler: (data: AlignmentResult) => {
+          const pair = this.storeManager.getPairByVideoId(data.target);
+          if (!pair) {
+            console.error('Pair not found for video:', data.target);
+            return;
+          }
+          pair.alignment = {
+            offset: data.offset,
+            confidence: data.confidence,
+            target: data.target,
+            elapsedTimeSeconds: data.elapsed_time_seconds,
+            // shortest video duration - offset
+            overlap: Math.min(pair.video1.duration, pair.video2.duration) - data.offset / 1000,
+          };
+
+          pair.video1.offset = data.target === pair.video2.id ? data.offset : 0;
+          pair.video2.offset = data.target === pair.video1.id ? data.offset : 0;
+
+          this.notifyDataUpdated();
+          this.storeManager.updatePair(pair);
+        },
+      },
+    ] as Process[];
+    return handlers;
   }
 
   // Notify the renderer process of data updates
@@ -195,8 +282,9 @@ class DataManager {
 
     const updatedPairs = pairs.map((pair) => ({
       ...pair,
-      video1: pair.video1.id === video.id ? video : pair.video1,
-      video2: pair.video2.id === video.id ? video : pair.video2,
+      // we are merging the video object here because otherwise we might potentially lose some previous processed data.
+      video1: pair.video1.id === video.id ? _.merge(pair.video1, video) : pair.video1,
+      video2: pair.video2.id === video.id ? video : _.merge(pair.video2, video),
     }));
 
     this.storeManager.updatePairs(updatedPairs);
@@ -252,9 +340,9 @@ class DataManager {
 
       // Process each batch of videos
       for (const videos of Object.values(videosToProcessGroupedByPair)) {
-        const results = await this.mediaProcessor.processBatch(
+        await this.mediaProcessor.processBatch(
           videos,
-          this.updateVideoState.bind(this)
+          this.processManager.handleProcess.bind(this.processManager),
         );
 
         // Mark processed videos
@@ -272,7 +360,6 @@ class DataManager {
         this.storeManager.updatePairs(updatedPairs);
 
         // Notify renderer about the updates
-        this.mainWindow.webContents.send('media-processed', results);
         this.notifyDataUpdated();
       }
 
@@ -341,7 +428,7 @@ class DataManager {
 
     // Process new videos
     const newVideos = await Promise.all(
-      result.filePaths.map(async (filePath) => {
+      result.filePaths.map(async filePath => {
         const stats = await fs.stat(filePath);
         return {
           id: path.basename(filePath),
@@ -353,7 +440,7 @@ class DataManager {
           size: stats.size,
           status: 'idle' as VideoStatus,
         };
-      })
+      }),
     );
     logger.log('newVideos :', newVideos);
 
@@ -453,6 +540,13 @@ class DataManager {
       extractedAudios: this.storeManager.get('extractedAudios'),
     };
   }
+
+  // Remove all videos data
+  removeAllVideos() {
+    this.storeManager.removeAllVideos();
+    this.notifyDataUpdated();
+    return true;
+  }
 }
 
 // Window manager
@@ -520,6 +614,11 @@ class IpcHandlerSetup {
     // Get all videos data
     ipcMain.handle('get-all-videos', async () => {
       return this.dataManager.getAllVideos();
+    });
+
+    // Remove all videos data
+    ipcMain.handle('remove-all-videos', async () => {
+      return this.dataManager.removeAllVideos();
     });
 
     // Auth handlers

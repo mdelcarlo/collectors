@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Video management
   uploadVideos: () => ipcRenderer.invoke('upload-videos'),
   getAllVideos: () => ipcRenderer.invoke('get-all-videos'),
+  removeAllVideos: () => ipcRenderer.invoke('remove-all-videos'),
 
   // Video pairing
   pairVideos: (video1Id: string, video2Id: string) =>
