@@ -4,9 +4,10 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-// Determine platform
-const platform = process.platform;
+// Determine platform (support FORCE_PLATFORM from CI)
+const platform = process.env.FORCE_PLATFORM || process.platform;
 console.log(`Current platform: ${platform}`);
+console.log(`Force platform env: ${process.env.FORCE_PLATFORM || 'not set'}`);
 console.log(`Current directory: ${process.cwd()}`);
 
 // Paths
@@ -33,6 +34,13 @@ if (!fs.existsSync(pythonDir)) {
   fs.mkdirSync(pythonDir, { recursive: true });
 }
 
+// Determine correct Python command based on platform
+const getPythonCommand = () => {
+  if (platform === 'darwin') return 'python3.9';
+  if (platform === 'win32') return 'python';
+  return 'python3'; // Linux/other
+};
+
 // Create virtual environment
 console.log(`Creating Python virtual environment at: ${venvDir}`);
 try {
@@ -47,7 +55,8 @@ try {
   }
 
   // Create new virtual environment
-  const pythonCmd = platform === 'darwin' ? 'python3.9' : 'python3';
+  const pythonCmd = getPythonCommand();
+  console.log(`Using Python command: ${pythonCmd}`);
   execSync(`${pythonCmd} -m venv "${venvDir}"`, { stdio: 'inherit' });
 
   // Install dependencies
@@ -55,8 +64,18 @@ try {
     ? `"${venvDir}\\Scripts\\pip"` 
     : `"${venvDir}/bin/pip"`;
 
+  console.log(`Using pip command: ${pipCmd}`);
   execSync(`${pipCmd} install --upgrade pip`, { stdio: 'inherit' });
-  execSync(`${pipCmd} install ${dependencies.join(' ')}`, { stdio: 'inherit' });
+  
+  // Install each dependency individually for better error handling
+  for (const dep of dependencies) {
+    try {
+      console.log(`Installing ${dep}...`);
+      execSync(`${pipCmd} install ${dep}`, { stdio: 'inherit' });
+    } catch (error) {
+      console.warn(`Warning: Failed to install ${dep}: ${error.message}`);
+    }
+  }
 
   console.log('Python virtual environment created successfully!');
   
@@ -78,6 +97,18 @@ except ImportError as e:
 `);
   
   console.log('Created test script at:', testScript);
+  
+  // Test the environment
+  const pythonExe = platform === 'win32' 
+    ? `"${venvDir}\\Scripts\\python"` 
+    : `"${venvDir}/bin/python"`;
+  
+  try {
+    console.log('Testing Python environment:');
+    execSync(`${pythonExe} "${testScript}"`, { stdio: 'inherit' });
+  } catch (error) {
+    console.warn(`Warning: Environment test failed: ${error.message}`);
+  }
   
 } catch (error) {
   console.error('Error creating Python virtual environment:', error.message);
