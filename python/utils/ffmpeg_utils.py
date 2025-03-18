@@ -87,7 +87,13 @@ def get_ffmpeg_path():
             logger.info(f"🍎 macOS: Using bundled FFmpeg at {ffmpeg_path}")
         elif platform == 'win32':  # Windows
             # In Windows: app directory/ffmpeg/ffmpeg.exe
-            base_dir = Path(sys.executable).parent / "resources"
+            base_dir = Path(sys.executable)
+            while base_dir.name != 'resources':
+                base_dir = base_dir.parent
+                # Safety check to prevent infinite loop
+                if str(base_dir) == '/':
+                    logger.error("❌ Could not find resources in path")
+                    break
             ffmpeg_path = base_dir / "ffmpeg.exe"
             logger.info(f"🪟 Windows: Using bundled FFmpeg at {ffmpeg_path}")
         else:  # Linux
