@@ -88,11 +88,11 @@ def get_ffmpeg_path():
         elif platform == 'win32':  # Windows
             # In Windows: app directory/ffmpeg/ffmpeg.exe
             base_dir = Path(sys.executable).parent / "resources"
-            ffmpeg_path = base_dir / "ffmpeg" / "ffmpeg.exe"
+            ffmpeg_path = base_dir / "ffmpeg.exe"
             logger.info(f"🪟 Windows: Using bundled FFmpeg at {ffmpeg_path}")
         else:  # Linux
             base_dir = Path(sys.executable).parent / "resources"
-            ffmpeg_path = base_dir / "ffmpeg" / "ffmpeg-linux"
+            ffmpeg_path = base_dir / "ffmpeg-linux"
             logger.info(f"🐧 Linux: Using bundled FFmpeg at {ffmpeg_path}")
     else:
         # For development environment
