@@ -17,7 +17,8 @@ def build_executables(force_universal2=False):
     # Define scripts to be packaged
     scripts = [
         "python/extract_video_info.py",
-        "python/create_sample_video.py"
+        "python/create_sample_video.py",
+        "python/align_videos.py"
     ]
     
     # Create platform-specific output directory
@@ -56,6 +57,8 @@ def build_executables(force_universal2=False):
         "--hidden-import", "pydub",
         "--hidden-import", "moviepy",
         "--hidden-import", "pip",
+        "--hidden-import", "time",
+        "--hidden-import", "static_ffmpeg",
         # project-specific modules
         "--hidden-import", "test_env",
         "--hidden-import", "utils",

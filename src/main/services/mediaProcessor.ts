@@ -16,7 +16,7 @@ export class MediaProcessor {
     this.outputDir = path.join(app.getPath("userData"), "media");
     this.thumbnailsDir = path.join(this.outputDir, "thumbnails");
     this.audioDir = path.join(this.outputDir, "audio");
-    
+
     // Get the path to the packaged Python executables
     this.pythonExecutablesDir = this.getPythonExecutablesPath();
     logger.log('🚀 MediaProcessor initializing...');
@@ -41,7 +41,7 @@ export class MediaProcessor {
 
     // In production, the executables are in the resources directory
     let executablesPath = '';
-    
+
     if (process.platform === 'darwin') {
       // For macOS, the path is inside the .app bundle
       executablesPath = path.join(app.getAppPath().replace('app.asar', ''), 'packaged_python', 'darwin');
@@ -107,7 +107,7 @@ export class MediaProcessor {
       // Create a worker for media processing
       const worker = new Worker(
         `
-        const fs = require('fs/promises')
+        const fsAsync = require('fs/promises')
         const { parentPort, workerData } = require('worker_threads');
         const path = require('path');
         const { exec } = require('child_process');
@@ -242,13 +242,13 @@ export class MediaProcessor {
             const os = require('os');
             const tempDir = path.join(os.tmpdir(), 'cb-app-temp');
             
-            await fs.mkdir(tempDir, { recursive: true });
+            await fsAsync.mkdir(tempDir, { recursive: true });
 
             const randomName = Math.random().toString(36).substring(2);
             
             const filePath = path.join(tempDir, randomName);
             
-            const fileHandle = await fs.open(filePath, 'w');
+            const fileHandle = await fsAsync.open(filePath, 'w');
             await fileHandle.close();
             
             return filePath;
@@ -257,24 +257,45 @@ export class MediaProcessor {
 
           async function readJsonFile(filePath) {
             try {
-              const data = await fs.readFile(filePath, "utf-8");
+              const data = await fsAsync.readFile(filePath, "utf-8");
               return JSON.parse(data);
             } catch (error) {
               console.error("Error reading JSON file:", error);
             }
           }
 
-          const { videos, pythonScriptsDir, pythonPath } = workerData;
+          const { videos, pythonExecutablesDir } = workerData;
           const filenames = videos.map(video => video.path).slice(0, 2).join(' ');
 
           console.log('Aligning videos...', filenames);
 
           let results
           const tempFile = await createRandomTempFile();
+          
           try {
-            const pythonScript = path.join(pythonScriptsDir, 'align_videos.py');
+            // Get the path to the align_videos executable
+              let executableName = 'align_videos';
+              if (process.platform === 'win32') {
+                executableName += '.exe';
+              }
+              
+              const executablePath = path.join(pythonExecutablesDir, executableName);
+              
+              // Check if the executable exists
+              if (!fs.existsSync(executablePath)) {
+                throw new Error(\`Executable not found at: \${executablePath}\`);
+              }
+              
+              parentPort.postMessage({ 
+                type: 'log', 
+                message: \`📜 Using executable: \${executablePath}\`
+              });
+              
+              // Build the command based on platform
+              const command = process.platform === 'win32' 
+                ? \`"\${executablePath}" -f "\${filenames}" --results-filepath "\${tempFile}"\`
+                : \`\${executablePath} -f "\${filenames}" --results-filepath "\${tempFile}"\`;
 
-            const command = \`\${pythonPath} "\${pythonScript}" -f \${filenames} --results-filepath \${tempFile}\`;
             const { stdout, stderr } = await execAsync(command);
 
             if (stderr) {
@@ -288,7 +309,7 @@ export class MediaProcessor {
             console.error('error aligning videos', err)
             throw err;
           } finally {
-            await fs.rm(tempFile, { recursive: true, force: true });
+            await fsAsync.rm(tempFile, { recursive: true, force: true });
           }
           return results
         }
