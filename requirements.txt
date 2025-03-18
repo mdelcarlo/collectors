@@ -1,4 +1,5 @@
 pip
+static_ffmpeg
 opencv-python
 moviepy
 audalign

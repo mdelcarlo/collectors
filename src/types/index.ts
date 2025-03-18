@@ -13,12 +13,13 @@ export interface Video {
   frameCount?: number;
   width?: number;
   height?: number;
-  checksum?: string;  
+  checksum?: string;
   processingTime?: number;
   startProcessingTime?: number;
   status: VideoStatus;
   error?: string;
-  preview?: string
+  preview?: string;
+  offset?: number; // offset in ms
 }
 
 export interface Pair {
@@ -26,6 +27,12 @@ export interface Pair {
   video1: Video;
   video2: Video;
   createdAt: Date;
+  alignment?: {
+    target: string; // path to the offseted video
+    offset: number; // offset in milliseconds
+    confidence: number; // 0-10, 10 being the most confident score
+    elapsedTimeSeconds: number; // time the process took in seconds
+  };
 }
 
 export interface Audio {

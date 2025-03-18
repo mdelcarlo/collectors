@@ -12,12 +12,7 @@ interface UploadPairModalProps {
   pair: { video1: Video; video2: Video };
 }
 
-
-const UploadPairModal: React.FC<UploadPairModalProps> = ({
-  isOpen,
-  onClose,
-  pair,
-}) => {
+const UploadPairModal: React.FC<UploadPairModalProps> = ({ isOpen, onClose, pair }) => {
   const [activity, setActivity] = useState('');
   const [environment, setEnvironment] = useState('');
   const [isSync, setIsSync] = useState(false);
@@ -31,50 +26,47 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
   });
 
   // Use your custom upload hook
-  const {
-    upload,
-    isLoading,
-    isError,
-    isSuccess,
-    error,
-  } = useVideoUpload({
-    onSuccess: (data) => {
+  const { upload, isLoading, isError, isSuccess, error } = useVideoUpload({
+    onSuccess: data => {
       console.log('Upload success:', data);
     },
-    onError: (err) => {
+    onError: err => {
       console.error('Upload error:', err);
     },
   });
 
   // Offset value in milliseconds (from your processing results)
-  const videoOffset = 5500; // 1.5 seconds offset (video2 starts 1.5s after video1)
-
-  const handleSubmit = async () => {
+  const handleSubmit = async ({ overlap }: { overlap: number }) => {
     const payload = {
       form: {
         activity,
         environment,
       },
-      checkList: [
-        isSync ? 'sync' : '',
-        isSufficientLighting ? 'lighting' : '',
-      ].filter(Boolean),
+      checkList: [isSync ? 'sync' : '', isSufficientLighting ? 'lighting' : ''].filter(Boolean),
       videos: [
         {
           metadata: { name: video1.name, size: video1.size },
           content: video1.preview,
+          checksum: video1.checksum,
+          processingResults: {
+            offset: video1.offset || 0,
+          },
         },
         {
           metadata: { name: video2.name, size: video2.size },
           content: video2.preview,
+          checksum: video2.checksum,
+          processingResults: {
+            offset: video2.offset || 0,
+          },
         },
       ],
       processingResults: {
         alignment: {
-          targetId: video2.id,
-          offset: videoOffset, // 1500 milliseconds
           confidence: 0,
-        }
+          elapsedTimeSeconds: 0,
+          overlap: overlap,
+        },
       },
     };
 
@@ -86,13 +78,22 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
     }
   };
 
+  const offset = video1.offset || video2.offset;
+
+  // Calculate overlap
+  const overlapStartMs = Math.max(offset < 0 ? Math.abs(offset) : 0, offset > 0 ? offset : 0);
+  const overlapEndMs = Math.min(
+    (offset < 0 ? Math.abs(offset) : 0) + video1.duration * 1000,
+    (offset > 0 ? offset : 0) + video2.duration * 1000,
+  );
+
+  const hasOverlap = overlapEndMs > overlapStartMs;
+  const overlapTimeSeconds = hasOverlap ? (overlapEndMs - overlapStartMs) / 1000 : 0;
+
   if (!isOpen) return null;
 
   return (
-    <div
-      
-      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-    >
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <motion.div
         className="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-w-3xl w-full"
         initial={{ opacity: 0, y: -20 }}
@@ -115,7 +116,6 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
           </div>
 
           <div className="overflow-y-auto mb-8" style={{ maxHeight: '80vh' }}>
-
             {/* Video Sync Visualizer Section */}
             {video1 && video2 && (
               <div className="mb-6">
@@ -124,15 +124,15 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
                     name: video1.name,
                     preview: video1.preview || '',
                     duration: video1.duration || 0,
-                    checksum: video1.checksum || 0,
+                    checksum: video1.checksum || '',
                   }}
                   video2={{
                     name: video2.name,
                     preview: video2.preview || '',
                     duration: video2.duration || 0,
-                    checksum: video2.checksum || 0,
+                    checksum: video2.checksum || '',
                   }}
-                  offset={videoOffset}
+                  offset={offset}
                   showThumbnails={true}
                 />
               </div>
@@ -145,7 +145,7 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
                   type="text"
                   placeholder="Activity"
                   value={activity}
-                  onChange={(e) => setActivity(e.target.value)}
+                  onChange={e => setActivity(e.target.value)}
                   className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                 />
               </div>
@@ -154,7 +154,7 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
                   type="text"
                   placeholder="Environment"
                   value={environment}
-                  onChange={(e) => setEnvironment(e.target.value)}
+                  onChange={e => setEnvironment(e.target.value)}
                   className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                 />
               </div>
@@ -167,13 +167,10 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
                   type="checkbox"
                   id="syncCheck"
                   checked={isSync}
-                  onChange={(e) => setIsSync(e.target.checked)}
+                  onChange={e => setIsSync(e.target.checked)}
                   className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
-                <label
-                  htmlFor="syncCheck"
-                  className="ml-2 text-gray-700 dark:text-gray-300"
-                >
+                <label htmlFor="syncCheck" className="ml-2 text-gray-700 dark:text-gray-300">
                   I checked and both videos are sync
                 </label>
               </div>
@@ -182,18 +179,14 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
                   type="checkbox"
                   id="lightingCheck"
                   checked={isSufficientLighting}
-                  onChange={(e) => setIsSufficientLighting(e.target.checked)}
+                  onChange={e => setIsSufficientLighting(e.target.checked)}
                   className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
-                <label
-                  htmlFor="lightingCheck"
-                  className="ml-2 text-gray-700 dark:text-gray-300"
-                >
+                <label htmlFor="lightingCheck" className="ml-2 text-gray-700 dark:text-gray-300">
                   Sufficient lighting in the videos
                 </label>
               </div>
             </div>
-
           </div>
 
           {/* Action buttons */}
@@ -205,18 +198,29 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({
               Cancel
             </button>
             <button
-              onClick={handleSubmit}
-              disabled={!video1 || !video2 || !isSync || !isSufficientLighting}
+              onClick={() => handleSubmit({ overlap: overlapTimeSeconds })}
+              disabled={
+                !video1 || !video2 || !isSync || !isSufficientLighting || overlapTimeSeconds < 30
+              }
               className={`
                 py-3 px-6 rounded-lg font-medium transition-colors
-                ${(!video1 || !video2 || !isSync || !isSufficientLighting)
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500'
-                  : 'bg-green-500 hover:bg-green-600 text-white'}
+                ${
+                  !video1 || !video2 || !isSync || !isSufficientLighting
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500'
+                    : 'bg-green-500 hover:bg-green-600 text-white'
+                }
               `}
             >
               Submit
             </button>
           </div>
+
+          {isLoading && <p className="mt-4 text-blue-500">Uploading...</p>}
+          {overlapTimeSeconds < 30 && (
+            <p className="mt-4 text-red-500">
+              Videos must have at least 30 seconds of overlap to be uploaded
+            </p>
+          )}
 
           {/* Optional: Display upload status */}
           {isLoading && <p className="mt-4 text-blue-500">Uploading...</p>}
