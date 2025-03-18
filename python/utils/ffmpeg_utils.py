@@ -2,6 +2,10 @@ import os
 import sys
 import logging
 from pathlib import Path
+import subprocess
+import static_ffmpeg
+
+static_ffmpeg.add_paths()
 
 # Set up logger
 logger = logging.getLogger("FFmpegUtils")

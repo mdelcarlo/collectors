@@ -7,6 +7,8 @@ import time
 import audalign as ad
 import os
 import tempfile
+import utils.ffmpeg_utils
+
 
 
 def is_video_file(file_path):
