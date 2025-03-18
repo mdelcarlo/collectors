@@ -91,6 +91,12 @@ jobs:
           fi
           echo "Found artifacts:"
           ls -la ./artifacts/
+
+      - name: Delete old artifacts
+        uses: geekyeggo/delete-artifact@v2
+        with:
+          name: robotics-contributors-${{ matrix.os }}
+          days-old: 1
       
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
