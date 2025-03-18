@@ -110,14 +110,14 @@ jobs:
                 });
               }
             }
-      
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: robotics-contributors-${{ matrix.os }}
           path: ./artifacts/
           retention-days: 1  # Reduced from 7 days to 1 day
-  
+
   # release:
   #   needs: build
   #   if: startsWith(github.ref, 'refs/tags/v')
