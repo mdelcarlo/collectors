@@ -271,7 +271,7 @@ export class MediaProcessor {
             }
           }
 
-          const { videos, pythonScriptsDir } = workerData;
+          const { videos, pythonScriptsDir, pythonPath } = workerData;
           const filenames = videos.map(video => video.path).slice(0, 2).join(' ');
 
           console.log('Aligning videos...', filenames);
@@ -281,7 +281,7 @@ export class MediaProcessor {
           try {
             const pythonScript = path.join(pythonScriptsDir, 'align_videos.py');
 
-            const command = \`python "\${pythonScript}" -f \${filenames} --results-filepath \${tempFile}\`;
+            const command = \`\${pythonPath} "\${pythonScript}" -f \${filenames} --results-filepath \${tempFile}\`;
             const { stdout, stderr } = await execAsync(command);
 
             if (stderr) {
