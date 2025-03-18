@@ -92,11 +92,24 @@ jobs:
           echo "Found artifacts:"
           ls -la ./artifacts/
 
-      - name: Delete old artifacts
-        uses: geekyeggo/delete-artifact@v2
+      - name: Delete old artifacts (GitHub API)
+        uses: actions/github-script@v6
         with:
-          name: robotics-contributors-${{ matrix.os }}
-          days-old: 1
+          script: |
+            const artifacts = await github.rest.actions.listArtifactsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            const artifactName = 'robotics-contributors-${{ matrix.os }}';
+            for (const artifact of artifacts.data) {
+              if (artifact.name.startsWith(artifactName)) {
+                await github.rest.actions.deleteArtifact({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  artifact_id: artifact.id,
+                });
+              }
+            }
       
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
