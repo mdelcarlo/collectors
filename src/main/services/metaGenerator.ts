@@ -47,7 +47,7 @@ export class MetaGenerator {
       logger.log(`🍏 macOS executables path: ${executablesPath}`);
     } else if (process.platform === 'win32') {
       // For Windows
-      executablesPath = path.join(app.getAppPath().replace('app.asar', ''), 'packaged_python', 'win32');
+      executablesPath = path.join(app.getAppPath().replace('app.asar', ''), 'packaged_python', 'windows');
       logger.log(`🪟 Windows executables path: ${executablesPath}`);
     } else {
       // For Linux
