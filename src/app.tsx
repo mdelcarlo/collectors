@@ -9,54 +9,58 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 const queryClient = new QueryClient();
 
 declare global {
-    interface Window {
-        electronAPI: {
-            uploadVideos: () => Promise<any>;
-            getAllVideos: () => Promise<any>;
-            pairVideos: (video1Id: string, video2Id: string) => Promise<any>;
-            unpairVideos: (pairId: string) => Promise<any>;
-            processMedia: (videoIds: string[]) => Promise<any>;
-            onVideosUpdated: (callback: (data: any) => void) => void;
-            removeAllListeners: (channel: string) => void;
-            onMediaProcessed: (callback: (data: any) => void) => void;
-            onAuthChanged: (callback: (data: { auth: AuthData }) => void) => void;
-            logout: () => Promise<any>;
-            getAuth: () => Promise<AuthData | null>;
-            getEnvironmentVariables: () => Promise<any>;
-            log: (callback: (data: any) => void) => void;
-        };
-    }
+  interface Window {
+    electronAPI: {
+      uploadVideos: () => Promise<any>;
+      getAllVideos: () => Promise<any>;
+      pairVideos: (video1Id: string, video2Id: string) => Promise<any>;
+      unpairVideos: (pairId: string) => Promise<any>;
+      processMedia: (videoIds: string[]) => Promise<any>;
+      onVideosUpdated: (callback: (data: any) => void) => void;
+      removeAllListeners: (channel: string) => void;
+      removeAllVideos: () => void;
+      onMediaProcessed: (callback: (data: any) => void) => void;
+      onAuthChanged: (callback: (data: { auth: AuthData }) => void) => void;
+      logout: () => Promise<any>;
+      getAuth: () => Promise<AuthData | null>;
+      getEnvironmentVariables: () => Promise<any>;
+      log: (callback: (data: any) => void) => void;
+      readFile: (filePath: string) => Promise<string>;
+      createBuffer: (base64Data: string) => Buffer;
+    };
+  }
 
-    interface ImportMetaEnv {
-        readonly VITE_PUBLIC_SCALE_BACKEND_URL: string;
-        readonly VITE_PUBLIC_SCALE_URL: string;
-    }
+  interface ImportMetaEnv {
+    readonly VITE_PUBLIC_SCALE_BACKEND_URL: string;
+    readonly VITE_PUBLIC_SCALE_URL: string;
+  }
 
-    interface ImportMeta {
-        readonly env: ImportMetaEnv;
-    }
+  interface ImportMeta {
+    readonly env: ImportMetaEnv;
+  }
 }
 
 const CustomFallback = () => (
-    <div style={{ textAlign: "center", marginTop: "2rem" }}>
-        <h1>Oops, an error occurred!</h1>
-        <p>Please restart the app or contact support.</p>
-    </div>
+  <div style={{ textAlign: 'center', marginTop: '2rem' }}>
+    <h1>Oops, an error occurred!</h1>
+    <p>Please restart the app or contact support.</p>
+  </div>
 );
 
 const rootElement = document.getElementById('app');
 if (!rootElement) {
-    console.error("Error: Could not find element with id 'app'");
+  console.error("Error: Could not find element with id 'app'");
 } else {
-    const root = createRoot(rootElement); root.render(
-        <React.StrictMode>
-            <ErrorBoundary fallbackComponent={<CustomFallback />}>
-                <AuthProvider>
-                    <QueryClientProvider client={queryClient}>
-                        <App />
-                    </QueryClientProvider>
-                </AuthProvider>
-            </ErrorBoundary>
-        </React.StrictMode>
-    );
+  const root = createRoot(rootElement);
+  root.render(
+    <React.StrictMode>
+      <ErrorBoundary fallbackComponent={<CustomFallback />}>
+        <AuthProvider>
+          <QueryClientProvider client={queryClient}>
+            <App />
+          </QueryClientProvider>
+        </AuthProvider>
+      </ErrorBoundary>
+    </React.StrictMode>
+  );
 }

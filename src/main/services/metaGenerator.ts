@@ -6,59 +6,57 @@ import { logger } from './loggerService';
 
 export class MetaGenerator {
   private outputDir: string;
-  private pythonScriptsDir: string;
-  private pythonPath: string;
+  private pythonExecutablesDir: string;
 
   constructor(mainWindow: BrowserWindow) {
     // Create thumbnails folder in app data directory
     this.outputDir = path.join(app.getPath('userData'), 'thumbnails');
-    this.pythonScriptsDir = path.join(app.getAppPath().replace('app.asar', ''), 'python');
+    
+    // Get the path to the packaged Python executables
+    this.pythonExecutablesDir = this.getPythonExecutablesPath();
 
     // Set the main window in the logger singleton
     logger.setMainWindow(mainWindow);
 
     logger.log('🚀 MetaGenerator initialized');
+    logger.log(`📂 Python executables directory: ${this.pythonExecutablesDir}`);
 
     this.ensureOutputDirExists();
-    this.pythonPath = this.getPythonPath();
   }
 
   /**
-   * Gets the appropriate Python path for the current environment
+   * Gets the path to the packaged Python executables based on the platform
    */
-  private getPythonPath(): string {
+  private getPythonExecutablesPath(): string {
     const isDev = !app.isPackaged;
     logger.log(`🔧 Environment: ${isDev ? 'development' : 'production'}`);
 
     if (isDev) {
-      // In development, use the system Python or local venv
-      const pythonPath = process.platform === 'darwin' ? 'python3.9' : 'python3';
-      logger.log(`🐍 Using development Python: ${pythonPath}`);
-      return pythonPath;
+      // In development, use the local packaged executables
+      const devExecutablesPath = path.join(app.getAppPath(), 'packaged_python', process.platform);
+      logger.log(`🔍 Development executables path: ${devExecutablesPath}`);
+      return devExecutablesPath;
     }
 
-    // In production, use the bundled Python
-    let pythonExecutable = '';
-
+    // In production, the executables are in the resources directory
+    let executablesPath = '';
+    
     if (process.platform === 'darwin') {
       // For macOS, the path is inside the .app bundle
-      const appDir = isDev ? path.dirname(path.dirname(app.getAppPath())) : path.dirname(app.getPath('exe')).split('/MacOS').join('');
-      pythonExecutable = path.join(appDir, 'Resources', 'venv', 'bin', 'python3.9');
-      logger.log(`🍏 macOS Python path: ${pythonExecutable}`);
+      executablesPath = path.join(app.getAppPath().replace('app.asar', ''), 'packaged_python', 'darwin');
+      logger.log(`🍏 macOS executables path: ${executablesPath}`);
     } else if (process.platform === 'win32') {
       // For Windows
-      const appDir = path.dirname(app.getAppPath()); // Go up to resources
-      pythonExecutable = path.join(appDir, 'venv', 'Scripts', 'python.exe');
-      logger.log(`🪟 Windows Python path: ${pythonExecutable}`);
+      executablesPath = path.join(app.getAppPath().replace('app.asar', ''), 'packaged_python', 'windows');
+      logger.log(`🪟 Windows executables path: ${executablesPath}`);
     } else {
       // For Linux
-      const appDir = path.dirname(app.getAppPath()); // Go up to resources
-      pythonExecutable = path.join(appDir, 'venv', 'bin', 'python3');
-      logger.log(`🐧 Linux Python path: ${pythonExecutable}`);
+      executablesPath = path.join(app.getAppPath().replace('app.asar', ''), 'packaged_python', 'linux');
+      logger.log(`🐧 Linux executables path: ${executablesPath}`);
     }
 
-    logger.log(`✅ Using Python executable: ${pythonExecutable}`);
-    return pythonExecutable;
+    logger.log(`✅ Using executables path: ${executablesPath}`);
+    return executablesPath;
   }
 
   private async ensureOutputDirExists() {
@@ -74,15 +72,14 @@ export class MetaGenerator {
 
   /**
    * Generate metadata for multiple videos concurrently using worker threads
-   * that call a Python script with OpenCV
+   * that call packaged Python executables
    */
   async generateBatch(videos: any[]): Promise<any[]> {
     return new Promise((resolve) => {
       logger.log(`🎬 Processing ${videos.length} videos for metadata generation`);
       logger.log(`⚙️ Configuration:
-        - Python path: ${this.pythonPath}
         - Output path: ${this.outputDir}
-        - Scripts path: ${this.pythonScriptsDir}
+        - Python executables path: ${this.pythonExecutablesDir}
       `);
       
       // Create a worker for metadata generation
@@ -92,6 +89,7 @@ export class MetaGenerator {
         const path = require('path');
         const { exec } = require('child_process');
         const util = require('util');
+        const fs = require('fs');
         const execAsync = util.promisify(exec);
                     
         parentPort.postMessage({ 
@@ -99,20 +97,36 @@ export class MetaGenerator {
           message: '🧵 Worker thread initialized'
         });
         
-        async function getVideoInfo(video, pythonScriptsDir, pythonPath) {
+        async function getVideoInfo(video, pythonExecutablesDir) {
           try {
             parentPort.postMessage({ 
               type: 'log', 
               message: \`🔍 Processing video: \${path.basename(video.path)}\`
             });
             
-            const pythonScript = path.join(pythonScriptsDir, 'extract_video_info.py');
+            // Get the path to the extract_video_info executable
+            let executableName = 'extract_video_info';
+            if (process.platform === 'win32') {
+              executableName += '.exe';
+            }
+            
+            const executablePath = path.join(pythonExecutablesDir, executableName);
+            
+            // Check if the executable exists
+            if (!fs.existsSync(executablePath)) {
+              throw new Error(\`Executable not found at: \${executablePath}\`);
+            }
+            
             parentPort.postMessage({ 
               type: 'log', 
-              message: \`📜 Python script path: \${pythonScript}\`
+              message: \`📜 Using executable: \${executablePath}\`
             });
             
-            const command = \`\${pythonPath} "\${pythonScript}" -i "\${video.path}"\`;
+            // Build the command based on platform
+            const command = process.platform === 'win32' 
+              ? \`"\${executablePath}" -i "\${video.path}"\`
+              : \`"\${executablePath}" -i '\${video.path}'\`;
+            
             parentPort.postMessage({ 
               type: 'log', 
               message: \`⚡ Executing command: \${command}\`
@@ -123,17 +137,17 @@ export class MetaGenerator {
             if (stderr) {
               parentPort.postMessage({ 
                 type: 'log', 
-                message: \`⚠️ Python stderr: \${stderr}\`
+                message: \`⚠️ Executable stderr: \${stderr}\`
               });
             }
             
-            // Parse the JSON output from the Python script
+            // Parse the JSON output from the executable
             const result = JSON.parse(stdout);
             
             if (result.error) {
               parentPort.postMessage({ 
                 type: 'log', 
-                message: \`❌ Python error: \${result.error}\`
+                message: \`❌ Executable error: \${result.error}\`
               });
               throw new Error(result.error);
             }
@@ -154,7 +168,7 @@ export class MetaGenerator {
         }
         
         async function processBatch() {
-          const { videos, pythonScriptsDir, pythonPath } = workerData;
+          const { videos, pythonExecutablesDir } = workerData;
           const results = [];
           
           parentPort.postMessage({ 
@@ -169,7 +183,7 @@ export class MetaGenerator {
             });
             
             try {
-              const videoInfo = await getVideoInfo(video, pythonScriptsDir, pythonPath);
+              const videoInfo = await getVideoInfo(video, pythonExecutablesDir);
               const processedVideo = {
                 ...video,
                 fps: videoInfo.fps,
@@ -220,8 +234,7 @@ export class MetaGenerator {
         eval: true,
         workerData: {
           videos,
-          pythonScriptsDir: this.pythonScriptsDir,
-          pythonPath: this.pythonPath,  // Pass the Python path to the worker
+          pythonExecutablesDir: this.pythonExecutablesDir,
         }
       });
 

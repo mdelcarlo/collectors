@@ -2,7 +2,7 @@ name: Build and Release
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, feat/bundler ]
     tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-latest, windows-latest]
+        platform: ${{ github.ref == 'refs/heads/feat/bundler' && fromJSON('["windows-latest"]') || fromJSON('["macos-latest", "ubuntu-latest", "windows-latest"]') }}
         include:
           - platform: macos-latest
             os: darwin
@@ -42,10 +42,19 @@ jobs:
           python-version: '3.10'
           cache: 'pip'
       
-      - name: Install Python dependencies
+      - name: Install Python dependencies (non-Windows)
+        if: matrix.platform != 'windows-latest'
         run: |
           python -m pip install --upgrade pip
           python -m pip install moviepy opencv-python numpy
+      
+      - name: Install Python dependencies (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: powershell
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install moviepy opencv-python numpy pyinstaller
+          # Add any Windows-specific packages needed
       
       - name: Package Application
         run: npm run package
@@ -76,19 +85,39 @@ jobs:
             cp -r out/make/rpm/x64/*.rpm ./artifacts/ || echo "No rpm files found"
             cp -r out/make/zip/linux/x64/*.zip ./artifacts/ || echo "No zip files found for Linux"
           elif [ "${{ matrix.platform }}" == "windows-latest" ]; then
-            cp -r out/make/squirrel.windows/x64/*.exe ./artifacts/ || echo "No exe installer found"
-            cp -r out/make/zip/win32/x64/*.zip ./artifacts/ || echo "No zip files found for Windows"
+            powershell -Command "New-Item -ItemType Directory -Force -Path ./artifacts"
+            powershell -Command "Copy-Item -Path out/make/squirrel.windows/x64/*.exe -Destination ./artifacts/ -ErrorAction SilentlyContinue" || echo "No exe installer found"
+            powershell -Command "Copy-Item -Path out/make/zip/win32/x64/*.zip -Destination ./artifacts/ -ErrorAction SilentlyContinue" || echo "No zip files found for Windows"
           fi
           echo "Found artifacts:"
           ls -la ./artifacts/
-      
+
+      - name: Delete old artifacts (GitHub API)
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const artifacts = await github.rest.actions.listArtifactsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            const artifactName = 'robotics-contributors-${{ matrix.os }}';
+            for (const artifact of artifacts.data) {
+              if (artifact.name.startsWith(artifactName)) {
+                await github.rest.actions.deleteArtifact({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  artifact_id: artifact.id,
+                });
+              }
+            }
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: robotics-contributors-${{ matrix.os }}
           path: ./artifacts/
-          retention-days: 7
-  
+          retention-days: 1  # Reduced from 7 days to 1 day
+
   # release:
   #   needs: build
   #   if: startsWith(github.ref, 'refs/tags/v')

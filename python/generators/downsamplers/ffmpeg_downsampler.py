@@ -2,6 +2,7 @@ import subprocess
 import os
 from generators.downsamplers.cv2_downsampler import BaseVideoDownsampler
 from utils.ENUMS import DEFAULT_OUTPUT_FPS, DEFAULT_OUTPUT_WIDTH
+from utils.ffmpeg_utils import get_ffmpeg_path
 
 class FFmpegDownsampler(BaseVideoDownsampler):
     def process(self, input_file, output_dir, output_filename, output_width=DEFAULT_OUTPUT_WIDTH, output_fps=DEFAULT_OUTPUT_FPS):
@@ -20,13 +21,14 @@ class FFmpegDownsampler(BaseVideoDownsampler):
             return
 
         os.makedirs(output_dir, exist_ok=True)
+        ffmpeg_path = get_ffmpeg_path()
 
         # FFmpeg command to resize and downsample
         cmd = [
             str(ffmpeg_path),
             '-y',                         # Overwrite output file if it exists
             '-i', input_file,
-            '-vf', f'fps={output_fps},scale={output_width}:-1',  # 1fps, width=320, height maintains aspect ratio
+            '-vf', f'fps={output_fps},scale={output_width}:-2',  # 1fps, width=320, height maintains aspect ratio
             '-c:v', 'libx264',            # Use H.264 codec
             '-crf', '23',                 # Reasonable quality
             '-preset', 'medium',          # Balance between encoding speed and compression

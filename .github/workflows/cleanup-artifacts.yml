@@ -1,0 +1,17 @@
+name: Cleanup Artifacts
+
+on:
+  workflow_dispatch:  # Manual trigger
+  schedule:
+    - cron: '0 0 * * *'  # Run daily at midnight
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete all artifacts
+        uses: geekyeggo/delete-artifact@v2
+        with:
+          failOnError: false
+          name: "*"  # Deletes all artifacts
+          age: "1 day"  # Only delete artifacts older than 1 day

@@ -6,10 +6,10 @@
   "main": ".vite/build/main.js",
   "scripts": {
     "start": "electron-forge start",
-    "package": "electron-forge package",
-    "make": "electron-forge make",
     "premake": "rm -rf out",
-    "postmake": "node scripts/bundle-python.js",
+    "build-python": "python build_python_executables.py",
+    "package": "npm run build-python && electron-forge package",
+    "make": "npm run build-python && electron-forge make",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx ."
   },
@@ -53,6 +53,7 @@
     "electron-store": "^10.0.1",
     "framer-motion": "^12.4.7",
     "jsonwebtoken": "^9.0.2",
+    "lodash": "^4.17.21",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-icons": "^5.5.0",

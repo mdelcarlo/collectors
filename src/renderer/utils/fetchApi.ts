@@ -1,37 +1,35 @@
-import { getCookie } from "./getCookie";
+import { getCookie } from './getCookie';
 
 export async function fetchApi(
   endpoint: string,
   config: RequestInit,
-  cache: RequestCache = 'no-cache',
+  cache: RequestCache = 'no-cache'
 ): Promise<Response> {
   const method = config.method ?? 'POST';
   try {
     const baseUrl = import.meta.env.VITE_PUBLIC_SCALE_BACKEND_URL;
-    const mergedHeaders = {
-      'Content-Type': 'application/json',
-    };
-    
+
     // Get CSRF token from multiple possible sources
-    const csrf = localStorage.getItem('csrf_token') || 
-                getCookie('_csrf') || 
-                getCookie('*csrf') || 
-                '';
-    
+    const csrf =
+      localStorage.getItem('csrf_token') ||
+      getCookie('_csrf') ||
+      getCookie('*csrf') ||
+      '';
+
     // Get JWT token from multiple possible sources
-    const jwt = localStorage.getItem('jwt_token') || getCookie('_jwt') || 
-               getCookie('*jwt') || 
-               '';
+    const jwt =
+      localStorage.getItem('jwt_token') ||
+      getCookie('_jwt') ||
+      getCookie('*jwt') ||
+      '';
 
     const response = await fetch(`${baseUrl}${endpoint}`, {
       cache,
       method,
       headers: {
         ...config.headers,
-        ...mergedHeaders,
-        'Content-Type': 'application/json',
         'x-csrf-token': csrf,
-        'Authorization': jwt ? `Bearer ${jwt}` : '',
+        Authorization: jwt ? `Bearer ${jwt}` : '',
       },
       credentials: 'include',
       ...config,

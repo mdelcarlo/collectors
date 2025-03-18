@@ -95,3 +95,6 @@ out/
 #python
 __pycache__/
 venv
+/packaged_python
+/build
+/venv

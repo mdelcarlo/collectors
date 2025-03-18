@@ -4,9 +4,10 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-// Determine platform
-const platform = process.platform;
+// Determine platform (support FORCE_PLATFORM from CI)
+const platform = process.env.FORCE_PLATFORM || process.platform;
 console.log(`Current platform: ${platform}`);
+console.log(`Force platform env: ${process.env.FORCE_PLATFORM || 'not set'}`);
 console.log(`Current directory: ${process.cwd()}`);
 
 // Paths
@@ -33,6 +34,13 @@ if (!fs.existsSync(pythonDir)) {
   fs.mkdirSync(pythonDir, { recursive: true });
 }
 
+// Determine correct Python command based on platform
+const getPythonCommand = () => {
+  if (platform === 'darwin') return 'python3.9';
+  if (platform === 'win32') return 'python';
+  return 'python3'; // Linux/other
+};
+
 // Create virtual environment
 console.log(`Creating Python virtual environment at: ${venvDir}`);
 try {
@@ -47,16 +55,46 @@ try {
   }
 
   // Create new virtual environment
-  const pythonCmd = platform === 'darwin' ? 'python3.9' : 'python3';
+  const pythonCmd = getPythonCommand();
+  console.log(`Using Python command: ${pythonCmd}`);
   execSync(`${pythonCmd} -m venv "${venvDir}"`, { stdio: 'inherit' });
 
-  // Install dependencies
+  // Get path to Python executable in the virtual environment
+  const pythonExe = platform === 'win32' 
+    ? `"${venvDir}\\Scripts\\python"` 
+    : `"${venvDir}/bin/python"`;
+  
+  // Get path to pip in the virtual environment
   const pipCmd = platform === 'win32' 
     ? `"${venvDir}\\Scripts\\pip"` 
     : `"${venvDir}/bin/pip"`;
 
-  execSync(`${pipCmd} install --upgrade pip`, { stdio: 'inherit' });
-  execSync(`${pipCmd} install ${dependencies.join(' ')}`, { stdio: 'inherit' });
+  // Upgrade pip the correct way for each platform
+  console.log('Upgrading pip...');
+  if (platform === 'win32') {
+    // On Windows, use Python to execute pip as a module
+    execSync(`${pythonExe} -m pip install --upgrade pip`, { stdio: 'inherit' });
+  } else {
+    // On other platforms, can use pip directly
+    execSync(`${pipCmd} install --upgrade pip`, { stdio: 'inherit' });
+  }
+  
+  // Install each dependency individually for better error handling
+  for (const dep of dependencies) {
+    try {
+      console.log(`Installing ${dep}...`);
+      // Skip pip as we've already upgraded it
+      if (dep.trim().toLowerCase() === 'pip') continue;
+      
+      if (platform === 'win32') {
+        execSync(`${pythonExe} -m pip install ${dep}`, { stdio: 'inherit' });
+      } else {
+        execSync(`${pipCmd} install ${dep}`, { stdio: 'inherit' });
+      }
+    } catch (error) {
+      console.warn(`Warning: Failed to install ${dep}: ${error.message}`);
+    }
+  }
 
   console.log('Python virtual environment created successfully!');
   
@@ -71,13 +109,21 @@ ${dependencies.map(dep => {
   const pkgName = dep.split('==')[0].split('>')[0].split('<')[0].trim();
   return `try:
     import ${pkgName.replace('-', '_')}
-    print(f"✓ {pkgName} imported successfully")
+    print(f"✓ ${pkgName} imported successfully")
 except ImportError as e:
-    print(f"✗ {pkgName} import failed: {e}")`;
+    print(f"✗ ${pkgName} import failed: {e}")`;
 }).join('\n')}
 `);
   
   console.log('Created test script at:', testScript);
+  
+  // Test the environment
+  try {
+    console.log('Testing Python environment:');
+    execSync(`${pythonExe} "${testScript}"`, { stdio: 'inherit' });
+  } catch (error) {
+    console.warn(`Warning: Environment test failed: ${error.message}`);
+  }
   
 } catch (error) {
   console.error('Error creating Python virtual environment:', error.message);

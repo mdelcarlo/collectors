@@ -1,6 +1,8 @@
 pip
+static_ffmpeg
 opencv-python
 moviepy
 audalign
 pydub
 numpy
+pyinstaller
