@@ -23,7 +23,11 @@ jobs:
             os: win32
     
     runs-on: ${{ matrix.platform }}
-    
+
+    env:
+      VITE_PUBLIC_SCALE_URL: ${{ secrets.VITE_PUBLIC_SCALE_URL }}
+      VITE_PUBLIC_SCALE_BACKEND_URL: ${{ secrets.VITE_PUBLIC_SCALE_BACKEND_URL }}
+
     steps:
       - uses: actions/checkout@v4
       
@@ -35,6 +39,11 @@ jobs:
       
       - name: Install dependencies
         run: npm ci
+
+      - name: Create .env File
+        run: |
+          echo "VITE_PUBLIC_SCALE_URL=${{ secrets.VITE_PUBLIC_SCALE_URL }}" >> .env
+          echo "VITE_PUBLIC_SCALE_BACKEND_URL=${{ secrets.VITE_PUBLIC_SCALE_BACKEND_URL }}" >> .env
       
       - name: Setup Python
         uses: actions/setup-python@v5
