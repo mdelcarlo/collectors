@@ -8,9 +8,9 @@ import audalign as ad
 import os
 import tempfile
 import utils.ffmpeg_utils
-import static_ffmpeg
+# import static_ffmpeg
 
-static_ffmpeg.add_paths()
+# static_ffmpeg.add_paths()
 
 
 def is_video_file(file_path):
@@ -229,7 +229,7 @@ def get_audio_offset(
     t = time.time()
 
     try:
-        static_ffmpeg.add_paths()
+        # static_ffmpeg.add_paths()
         # Use the temporary directory for alignment
         results = ad.align(
             temp_dir,
