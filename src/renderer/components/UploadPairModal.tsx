@@ -57,7 +57,7 @@ const UploadPairModal: React.FC<UploadPairModalProps> = ({ isOpen, onClose, pair
           content: video2.preview,
           checksum: video2.checksum,
           processingResults: {
-            offset: video2.offset || 0,
+            offset: video2.offset || 1.1,
           },
         },
       ],

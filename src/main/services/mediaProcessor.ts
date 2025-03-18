@@ -368,7 +368,7 @@ export class MediaProcessor {
           parentPort.postMessage({ type: 'complete', results });
         }
 
-        Promise.all([processBatch(), alignVideos()])
+        Promise.all([processBatch()])
           .then(_=> {
             parentPort.postMessage({ type: 'complete' })
           });

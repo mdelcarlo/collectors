@@ -23,7 +23,11 @@ jobs:
             os: win32
     
     runs-on: ${{ matrix.platform }}
-    
+
+    env:
+      VITE_PUBLIC_SCALE_URL: ${{ secrets.VITE_PUBLIC_SCALE_URL }}
+      VITE_PUBLIC_SCALE_BACKEND_URL: ${{ secrets.VITE_PUBLIC_SCALE_BACKEND_URL }}
+
     steps:
       - uses: actions/checkout@v4
       
@@ -35,6 +39,11 @@ jobs:
       
       - name: Install dependencies
         run: npm ci
+
+      - name: Create .env File
+        run: |
+          echo "VITE_PUBLIC_SCALE_URL=${{ secrets.VITE_PUBLIC_SCALE_URL }}" >> .env
+          echo "VITE_PUBLIC_SCALE_BACKEND_URL=${{ secrets.VITE_PUBLIC_SCALE_BACKEND_URL }}" >> .env
       
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -53,7 +62,7 @@ jobs:
         shell: powershell
         run: |
           python -m pip install --upgrade pip
-          python -m pip install moviepy opencv-python numpy pyinstaller
+          python -m pip install moviepy opencv-python numpy pyinstaller audalign pydub static_ffmpeg
           # Add any Windows-specific packages needed
       
       - name: Package Application
@@ -91,25 +100,6 @@ jobs:
           fi
           echo "Found artifacts:"
           ls -la ./artifacts/
-
-      - name: Delete old artifacts (GitHub API)
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const artifacts = await github.rest.actions.listArtifactsForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-            });
-            const artifactName = 'robotics-contributors-${{ matrix.os }}';
-            for (const artifact of artifacts.data) {
-              if (artifact.name.startsWith(artifactName)) {
-                await github.rest.actions.deleteArtifact({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  artifact_id: artifact.id,
-                });
-              }
-            }
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
